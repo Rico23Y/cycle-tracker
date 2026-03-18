@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { BookOpen, Calendar, Eye, FolderGit2, LayoutGrid, ThermometerSun, UserRound, Venus } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -21,6 +21,31 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Calendar',
+        href: '/calendar',
+        icon: Calendar,
+    },
+    {
+        title: 'Cycles',
+        href: '/cycles',
+        icon: Venus,
+    },
+    {
+        title: 'BBT',
+        href: '/bbt',
+        icon: ThermometerSun,
+    },
+    {
+        title: 'Insights',
+        href: '/insights',
+        icon: Eye,
+    },
+    {
+        title: 'Partners',
+        href: '/partners',
+        icon: UserRound,
     },
 ];
 
