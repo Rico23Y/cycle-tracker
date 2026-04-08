@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cycle;
 use App\Http\Requests\StoreCycleRequest;
 use App\Http\Requests\UpdateCycleRequest;
+use Inertia\Inertia;
 
 class CycleController extends Controller
 {
@@ -13,7 +14,7 @@ class CycleController extends Controller
      */
     public function index()
     {
-        dd('hello');
+       return Inertia::render('cycles/index');
     }
 
     /**

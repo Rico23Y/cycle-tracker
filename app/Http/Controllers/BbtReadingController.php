@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BbtReading;
 use App\Http\Requests\StoreBbtReadingRequest;
 use App\Http\Requests\UpdateBbtReadingRequest;
+use Inertia\Inertia;
 
 class BbtReadingController extends Controller
 {
@@ -13,7 +14,7 @@ class BbtReadingController extends Controller
      */
     public function index()
     {
-        //
+        return Inertia::render('bbt/index');
     }
 
     /**

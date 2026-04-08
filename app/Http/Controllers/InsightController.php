@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Insight;
 use App\Http\Requests\StoreInsightRequest;
 use App\Http\Requests\UpdateInsightRequest;
+use Inertia\Inertia;
 
 class InsightController extends Controller
 {
@@ -13,7 +14,7 @@ class InsightController extends Controller
      */
     public function index()
     {
-        //
+        return Inertia::render('insights/index');
     }
 
     /**

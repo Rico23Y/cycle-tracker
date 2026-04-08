@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Partner;
 use App\Http\Requests\StorePartnerRequest;
 use App\Http\Requests\UpdatePartnerRequest;
+use Inertia\Inertia;
 
 class PartnerController extends Controller
 {
@@ -13,7 +14,7 @@ class PartnerController extends Controller
      */
     public function index()
     {
-        //
+        return Inertia::render('partners/index');
     }
 
     /**

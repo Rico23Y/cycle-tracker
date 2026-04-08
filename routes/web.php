@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\CycleController;
+use App\Http\Controllers\BbtReadingController;
+use App\Http\Controllers\PartnerController;
+use App\Http\Controllers\InsightController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
