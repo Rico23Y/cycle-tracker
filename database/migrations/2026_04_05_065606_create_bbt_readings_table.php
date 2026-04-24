@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('bbt_readings', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); 
+            $table->foreignId('cycle_id')->constrained()->onDelete('cascade');
+            $table->date('date');
+            $table->decimal('temperature', 5, 3);
+            $table->string('unit')->default('C');
             $table->timestamps();
         });
     }
