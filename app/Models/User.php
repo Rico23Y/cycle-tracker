@@ -55,4 +55,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Cycle::class);
     }
+
+    public function bbtReadings()
+    {
+        return $this->hasMany(\App\Models\BbtReading::class);
+    }
 }

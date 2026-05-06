@@ -12,6 +12,10 @@ class BbtReading extends Model
 
     protected $fillable = ['user_id', 'cycle_id', 'date', 'temperature', 'unit'];
 
+        protected $casts = [
+        'temperature' => 'float',
+    ];
+    
     public function cycle()
     {
         return $this->belongsTo(Cycle::class);
