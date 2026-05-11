@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Inertia\Inertia;
+use App\Services\CyclePredictionService;
 
 class DashboardController extends Controller
 {
@@ -10,18 +11,23 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
-        // ✅ Get latest 7 readings across ALL cycles
         $readings = $user->bbtReadings()
             ->orderBy('date', 'desc')
             ->take(7)
             ->get();
 
-        // (optional) still get latest cycle if you need it later
-        $latestCycle = $user->cycles()->latest()->first();
+        $cycles = $user->cycles()
+            ->orderBy('start_date')
+            ->get();
+
+        $predictionService = new CyclePredictionService();
+
+        $nextPeriod = $predictionService
+            ->predictNextPeriod($cycles);
 
         return Inertia::render('dashboard/index', [
             'readings' => $readings,
-            'cycle' => $latestCycle, // optional
+            'nextPeriod' => $nextPeriod,
         ]);
     }
 }

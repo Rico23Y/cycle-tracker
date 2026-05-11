@@ -20,7 +20,7 @@ class CalendarController extends Controller
             ->with(['bbtReadings', 'symptoms'])
             ->get();
 
-        dd($cycles->toArray());
+        // dd($cycles->toArray());
 
         return Inertia::render('calendar/index', [
             'cycles' => $cycles,

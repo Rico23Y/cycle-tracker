@@ -3,6 +3,7 @@ import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import type { BreadcrumbItem } from '@/types';
+import { dashboard } from '@/routes';
 
 import {
     LineChart,
@@ -16,7 +17,7 @@ import {
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
-        href: '/dashboard',
+        href: dashboard(),
     },
 ];
 
@@ -25,15 +26,29 @@ type BbtReading = {
     temperature: number;
 };
 
-type Props = {
-    readings: BbtReading[];
+type NextPeriod = {
+    predicted_date: string;
+    days_left: number;
+
+    ovulation_date: string;
+    ovulation_days_left: number;
+
+    fertile_window_start: string;
+
+    average_cycle_length: number;
 };
 
-export default function Dashboard({ readings }: Props) {
+type Props = {
+    readings: BbtReading[];
+    nextPeriod: NextPeriod | null;
+};
+
+export default function Dashboard({ readings, nextPeriod }: Props) {
 
     useEffect(() => {
-    console.log('Readings:', readings);
-    }, [readings]);
+    console.log('Readings:', readings)
+    console.log('nextPeriod:', nextPeriod);
+    }, [readings, nextPeriod]);
 
     const { data, setData, post, processing, reset } = useForm({
         temperature: '',
@@ -122,12 +137,108 @@ export default function Dashboard({ readings }: Props) {
 
                 {/* Other tiles (keep your placeholders for now) */}
                 <div className="grid gap-4 md:grid-cols-3">
-                    <div className="aspect-video border rounded-xl">
-                        <PlaceholderPattern />
+                    <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
+
+                        <h3 className="text-sm font-semibold mb-4">
+                            Next Period
+                        </h3>
+
+                        {nextPeriod ? (
+                            <>
+                                <div className="text-4xl font-bold">
+                                    {nextPeriod.days_left >= 0
+                                        ? nextPeriod.days_left
+                                        : Math.abs(nextPeriod.days_left)}
+                                </div>
+
+                                <div className="text-sm text-muted-foreground">
+                                    {nextPeriod.days_left >= 0
+                                        ? 'days left'
+                                        : 'days late'}
+                                </div>
+
+                                <div className="mt-4 text-sm">
+                                    Predicted Date
+                                </div>
+
+                                <div className="font-medium">
+                                    {new Date(nextPeriod.predicted_date)
+                                        .toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No cycle prediction available
+                            </div>
+                        )}
+
                     </div>
-                    <div className="aspect-video border rounded-xl">
-                        <PlaceholderPattern />
-                    </div>
+
+                    <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
+
+                        <h3 className="text-sm font-semibold mb-4">
+                            Ovulation Window
+                        </h3>
+
+                        {nextPeriod ? (
+                            <>
+
+                                {/* Days Left */}
+                                <div className="text-4xl font-bold">
+                                    {nextPeriod.ovulation_days_left >= 0
+                                        ? nextPeriod.ovulation_days_left
+                                        : Math.abs(nextPeriod.ovulation_days_left)}
+                                </div>
+
+                                <div className="text-sm text-muted-foreground">
+                                    {nextPeriod.ovulation_days_left >= 0
+                                        ? 'days until ovulation'
+                                        : 'days past ovulation'}
+                                </div>
+
+                                {/* Ovulation Date */}
+                                <div className="mt-4 text-sm">
+                                    Ovulation Date
+                                </div>
+
+                                <div className="font-medium">
+                                    {new Date(nextPeriod.ovulation_date)
+                                        .toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                </div>
+
+                                {/* Fertile Window */}
+                                <div className="mt-4 text-sm">
+                                    Fertile Window Starts
+                                </div>
+
+                                <div className="font-medium">
+                                    {new Date(nextPeriod.fertile_window_start)
+                                        .toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                </div>
+
+                            </>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No ovulation prediction available
+                            </div>
+                        )}
+
+                    </div>                    
+
+
+
                     <div className="aspect-video border rounded-xl">
                         <PlaceholderPattern />
                     </div>
