@@ -58,6 +58,11 @@ class User extends Authenticatable
 
     public function bbtReadings()
     {
-        return $this->hasMany(\App\Models\BbtReading::class);
+        return $this->hasMany(BbtReading::class);
+    }
+
+    public function symptoms()
+    {
+        return $this->hasMany(Symptom::class);
     }
 }

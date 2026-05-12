@@ -15,59 +15,121 @@ class CycleSeeder extends Seeder
     {
         try {
 
-            $this->command->info("--- SEEDER IS RUNNING ---"); // ADD THIS
-            // 1. Get or Create a test user
+            $this->command->info('--- SEEDER IS RUNNING ---');
+
+            // Create/Get User
             $user = User::first() ?? User::factory()->create([
                 'name' => 'Test User',
                 'email' => 'test@example.com',
             ]);
 
-            // 2. Define some possible symptoms to pick from
-            $symptomTypes = ['Cramps', 'Headache', 'Bloating', 'Fatigue', 'Acne', 'Mood Swings'];
+            $symptomTypes = [
+                'Cramps',
+                'Headache',
+                'Bloating',
+                'Fatigue',
+                'Acne',
+                'Mood Swings',
+            ];
 
-            // 3. Create 3 cycles (Current month, last month, 2 months ago)
-            for ($i = 0; $i < 3; $i++) {
-                $start = Carbon::now()->subMonths(3 - $i)->startOfMonth();
-                $cycleLength = 28;
+            /*
+            |--------------------------------------------------------------------------
+            | Generate realistic cycle starts
+            |--------------------------------------------------------------------------
+            */
 
-                $cycle = Cycle::create([
-                    'user_id'    => $user->id,
-                    'start_date' => $start,
-                    'end_date'   => $start->copy()->addDays($cycleLength - 1),
-                    'length'     => $cycleLength,
+            $cycleStarts = [];
+
+            $start = Carbon::now()
+                ->subMonths(6)
+                ->startOfMonth();
+
+            for ($i = 0; $i < 6; $i++) {
+
+                // realistic variability
+                $cycleLength = rand(26, 31);
+
+                $cycleStarts[] = $start->copy();
+
+                $start->addDays($cycleLength);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Store cycles
+            |--------------------------------------------------------------------------
+            */
+
+            foreach ($cycleStarts as $cycleStart) {
+
+                Cycle::create([
+                    'user_id' => $user->id,
+                    'start_date' => $cycleStart,
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Generate continuous daily BBT timeline
+            |--------------------------------------------------------------------------
+            */
+
+            $timelineStart = $cycleStarts[0]->copy();
+
+            $timelineEnd = Carbon::now();
+
+            for (
+                $date = $timelineStart->copy();
+                $date->lte($timelineEnd);
+                $date->addDay()
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Generate realistic BBT
+                |--------------------------------------------------------------------------
+                |
+                | Follicular phase:
+                | 36.1 - 36.4
+                |
+                | Luteal phase:
+                | 36.5 - 37.0
+                |
+                */
+
+                $temperature = rand(3610, 3700) / 100;
+
+                BbtReading::create([
+                    'user_id' => $user->id,
+                    'date' => $date->copy(),
+                    'temperature' => $temperature,
                 ]);
 
-                // 4. Loop through every day of the cycle
-                for ($d = 0; $d < $cycleLength; $d++) {
-                    $currentDate = $start->copy()->addDays($d);
+                /*
+                |--------------------------------------------------------------------------
+                | Random symptoms
+                |--------------------------------------------------------------------------
+                */
 
-                    // Add BBT Reading
-                    BbtReading::create([
-                        'user_id'     => $user->id,
-                        'cycle_id'    => $cycle->id,
-                        'date'        => $currentDate,
-                        'temperature' => rand(36200, 37200) / 1000, // Generates 36.xxx format for your (5,3) decimal
-                        'unit'        => 'C',
+                if (rand(0, 100) < 35) {
+
+                    Symptom::create([
+                        'user_id' => $user->id,
+                        'date' => $date->copy(),
+                        'type' => $symptomTypes[array_rand($symptomTypes)],
+                        'level' => rand(1, 5),
+                        'notes' => 'Auto-generated symptom',
                     ]);
-
-                    // Add a random Symptom 50% of the time
-                    if (rand(0, 1)) {
-                        Symptom::create([
-                            'user_id'  => $user->id,
-                            'cycle_id' => $cycle->id,
-                            'date'     => $currentDate,
-                            'type'     => $symptomTypes[array_rand($symptomTypes)],
-                            'level'    => rand(1, 5),
-                            'notes'    => 'Auto-generated test symptom',
-                        ]);
-                    }
                 }
             }
 
-            $this->command->info("--- SEEDING FINISHED! ---");
+            $this->command->info('--- SEEDING FINISHED ---');
 
         } catch (\Exception $e) {
-        $this->command->error("CRASHED: " . $e->getMessage());
+
+            $this->command->error(
+                'CRASHED: ' . $e->getMessage()
+            );
         }
     }
 }

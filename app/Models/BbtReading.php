@@ -10,14 +10,14 @@ class BbtReading extends Model
     /** @use HasFactory<\Database\Factories\BbtReadingFactory> */
     use HasFactory;
 
-    protected $fillable = ['user_id', 'cycle_id', 'date', 'temperature', 'unit'];
+    protected $fillable = ['user_id', 'date', 'temperature'];
 
         protected $casts = [
         'temperature' => 'float',
     ];
-    
-    public function cycle()
+
+    public function user()
     {
-        return $this->belongsTo(Cycle::class);
-    }
+        return $this->belongsTo(User::class);
+}
 }

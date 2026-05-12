@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import '../css/app.css';
 import { initializeTheme } from '@/hooks/use-appearance';
+import 'react-day-picker/dist/style.css';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

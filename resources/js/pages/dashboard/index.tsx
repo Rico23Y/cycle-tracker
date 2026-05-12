@@ -3,6 +3,7 @@ import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import type { BreadcrumbItem } from '@/types';
+import { DayPicker } from 'react-day-picker';
 import { dashboard } from '@/routes';
 
 import {
@@ -34,8 +35,12 @@ type NextPeriod = {
     ovulation_days_left: number;
 
     fertile_window_start: string;
+    fertile_window_end: string;
 
     average_cycle_length: number;
+
+    pregnancy_test_date: string;
+
 };
 
 type Props = {
@@ -75,7 +80,7 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
 
             <div className="flex flex-col gap-4 p-4">
 
-                {/* 🔹 TILE 1 */}
+                {/* 1st tile */}
                 <div className="rounded-xl border p-4 space-y-4">
 
                     {/* 📈 Graph */}
@@ -134,9 +139,10 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                     </form>
 
                 </div>
+                
 
-                {/* Other tiles (keep your placeholders for now) */}
-                <div className="grid gap-4 md:grid-cols-3">
+                {/* 2nd tile */}
+                <div className="grid gap-4 md:grid-cols-2">
                     <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
 
                         <h3 className="text-sm font-semibold mb-4">
@@ -176,8 +182,55 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                             </div>
                         )}
 
+                    </div>                  
+
+                    {/* 4th tile */}
+                    <div className="border rounded-xl p-4 md:row-span-2 flex flex-col justify-between">
+
+                        <h3 className="text-sm font-semibold mb-4">
+                            Cycle Calendar
+                        </h3>
+
+                        {nextPeriod && (
+                            <DayPicker
+                                disableNavigation
+                                hideNavigation
+                                fixedWeeks
+                                showOutsideDays
+
+                                month={new Date(nextPeriod.predicted_date)}
+
+                                modifiers={{
+                                    period: [
+                                        new Date(nextPeriod.predicted_date + 'T00:00:00')
+                                    ],
+
+                                    fertile: {
+                                        from: new Date(nextPeriod.fertile_window_start),
+                                        to: new Date(nextPeriod.fertile_window_end),
+                                    },
+
+                                    ovulation: [
+                                        new Date(nextPeriod.ovulation_date),
+                                    ],
+
+                                    pregnancy: [
+                                        new Date(nextPeriod.pregnancy_test_date),
+                                    ],
+                                }}
+
+                                modifiersClassNames={{
+                                    period: 'bg-red-300 text-black rounded-full',
+                                    fertile: 'bg-blue-200 text-black rounded-full',
+                                    ovulation: 'bg-blue-500 text-white rounded-full',
+                                    pregnancy: 'bg-orange-200 text-black rounded-full',
+                                }}
+                            />
+                        )}
+
                     </div>
 
+                    {/* 3rd tile */}                    
                     <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
 
                         <h3 className="text-sm font-semibold mb-4">
@@ -235,13 +288,9 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                             </div>
                         )}
 
-                    </div>                    
+                    </div>  
 
 
-
-                    <div className="aspect-video border rounded-xl">
-                        <PlaceholderPattern />
-                    </div>
                 </div>
 
             </div>

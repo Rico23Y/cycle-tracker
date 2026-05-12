@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('symptoms', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); 
-            $table->foreignId('cycle_id')->constrained()->onDelete('cascade');
             $table->date('date');
             $table->string('type'); // e.g., 'Cramps', 'Headache'
             $table->integer('level')->default(1); // 1-5 scale, defaults to 1

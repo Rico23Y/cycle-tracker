@@ -35,6 +35,8 @@ class CyclePredictionService
         $sliceLength = $totalCycles >= 6 ? -6 : -$totalCycles;
         $recentLengths = array_slice($lengths, $sliceLength);
 
+        //dd($sorted);
+
         // calculate the averate safely
         $averageLength = $totalCycles > 0 
             ? round(array_sum($recentLengths) / count($recentLengths)) 
@@ -50,6 +52,10 @@ class CyclePredictionService
         $ovulationDate = $predictedDate->copy()->subDays(14);
 
         $fertileWindowStart = $ovulationDate->copy()->subDays(5);
+
+        $fertileWindowEnd = $ovulationDate->copy();
+
+        $pregnancyTestDate = $predictedDate->copy()->addDays(7);
 
         $ovulationDaysLeft = now()->startOfDay()
             ->diffInDays($ovulationDate, false);
@@ -68,9 +74,13 @@ class CyclePredictionService
 
             // Fertile Window
             'fertile_window_start' => $fertileWindowStart->toDateString(),
+            'fertile_window_end' => $fertileWindowEnd->toDateString(),            
 
             // Meta
             'average_cycle_length' => $averageLength,
+
+            // Pregnancy test
+            'pregnancy_test_date' => $pregnancyTestDate->toDateString(),
         ];
     }
 }
