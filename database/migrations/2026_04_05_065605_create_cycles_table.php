@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->date('start_date');
+            $table->integer('period_length')->nullable();
             $table->unique(['user_id', 'start_date']);
             $table->timestamps();
         });

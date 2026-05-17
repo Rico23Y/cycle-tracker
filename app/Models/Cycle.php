@@ -10,7 +10,7 @@ class Cycle extends Model
     /** @use HasFactory<\Database\Factories\CycleFactory> */
     use HasFactory;
 
-    protected $fillable = ['user_id', 'start_date'];
+    protected $fillable = ['user_id', 'start_date', 'period_length'];
 
     public function user()
     {

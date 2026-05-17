@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\Request;
+use App\Services\CyclePredictionService;
 
 class CalendarController extends Controller
 {
@@ -12,18 +13,26 @@ class CalendarController extends Controller
      * Display the main calendar view.
      * This is what loads when you visit /calendar
      */
-    public function index()
+    public function index(CyclePredictionService $predictionService)
     {
         $user = auth()->user();
 
         $cycles = $user->cycles()
-            ->with(['bbtReadings', 'symptoms'])
+            ->orderBy('start_date')
             ->get();
 
-        // dd($cycles->toArray());
+        $bbtReadings = $user->bbtReadings()->get();
+
+        $symptoms = $user->symptoms()->get();
+
+        $nextPeriod = $predictionService
+            ->predictNextPeriod($cycles);
 
         return Inertia::render('calendar/index', [
             'cycles' => $cycles,
+            'bbtReadings' => $bbtReadings,
+            'symptoms' => $symptoms,
+            'nextPeriod' => $nextPeriod,
         ]);
     }
 

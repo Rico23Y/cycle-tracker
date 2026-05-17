@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import type { BreadcrumbItem } from '@/types';
 import { DayPicker } from 'react-day-picker';
 import { dashboard } from '@/routes';
@@ -29,6 +28,7 @@ type BbtReading = {
 
 type NextPeriod = {
     predicted_date: string;
+    predicted_last_period_date: string;
     days_left: number;
 
     ovulation_date: string;
@@ -205,6 +205,11 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                         new Date(nextPeriod.predicted_date + 'T00:00:00')
                                     ],
 
+                                    periodLength: {
+                                        from: new Date(nextPeriod.predicted_date + 'T00:00:00'),
+                                        to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
+                                    },
+
                                     fertile: {
                                         from: new Date(nextPeriod.fertile_window_start),
                                         to: new Date(nextPeriod.fertile_window_end),
@@ -220,10 +225,11 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 }}
 
                                 modifiersClassNames={{
-                                    period: 'bg-red-300 text-black rounded-full',
+                                    period: 'bg-red-400 text-black rounded-full',
+                                    periodLength: 'bg-red-200 text-black rounded-full',
                                     fertile: 'bg-blue-200 text-black rounded-full',
-                                    ovulation: 'bg-blue-500 text-white rounded-full',
-                                    pregnancy: 'bg-orange-200 text-black rounded-full',
+                                    ovulation: '!bg-blue-500 text-white rounded-full',
+                                    pregnancy: '!bg-orange-200 text-black rounded-full',
                                 }}
                             />
                         )}

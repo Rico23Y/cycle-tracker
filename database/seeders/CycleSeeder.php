@@ -33,6 +33,7 @@ class CycleSeeder extends Seeder
             ];
 
             /*
+
             |--------------------------------------------------------------------------
             | Generate realistic cycle starts
             |--------------------------------------------------------------------------
@@ -40,13 +41,11 @@ class CycleSeeder extends Seeder
 
             $cycleStarts = [];
 
-            $start = Carbon::now()
+            $start = Carbon::today()
                 ->subMonths(6)
                 ->startOfMonth();
 
             for ($i = 0; $i < 6; $i++) {
-
-                // realistic variability
                 $cycleLength = rand(26, 31);
 
                 $cycleStarts[] = $start->copy();
@@ -55,18 +54,24 @@ class CycleSeeder extends Seeder
             }
 
             /*
+
             |--------------------------------------------------------------------------
             | Store cycles
             |--------------------------------------------------------------------------
             */
 
             foreach ($cycleStarts as $cycleStart) {
+                
+                
+                $periodLength = rand(3, 7); 
 
                 Cycle::create([
                     'user_id' => $user->id,
                     'start_date' => $cycleStart,
+                    'period_length' => $periodLength 
                 ]);
             }
+
 
             /*
             |--------------------------------------------------------------------------

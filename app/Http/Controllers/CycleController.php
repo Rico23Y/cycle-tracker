@@ -14,8 +14,8 @@ class CycleController extends Controller
      */
     public function index()
     {
-        $data = auth()->user()->cycles()->with(['bbtReadings', 'symptoms'])->get();
-        //dd($data);
+        // $data = auth()->user()->cycles()->get();
+        // dd($data->toArray());
 
         return Inertia::render('cycles/index');
     }
