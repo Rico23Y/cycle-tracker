@@ -27,12 +27,21 @@ type BbtReading = {
 };
 
 type NextPeriod = {
-    predicted_date: string;
+    current_period_start_date: string;
+    current_period_end_date: string;
+
+    predicted_period_date: string;
     predicted_last_period_date: string;
     days_left: number;
 
     ovulation_date: string;
     ovulation_days_left: number;
+
+    post_safe_start: number;
+    post_safe_end: number;
+
+    pre_safe_start: number;
+    pre_safe_end: number;
 
     fertile_window_start: string;
     fertile_window_end: string;
@@ -168,7 +177,7 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 </div>
 
                                 <div className="font-medium">
-                                    {new Date(nextPeriod.predicted_date)
+                                    {new Date(nextPeriod.predicted_period_date)
                                         .toLocaleDateString('en-US', {
                                             month: 'long',
                                             day: 'numeric',
@@ -198,21 +207,40 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 fixedWeeks
                                 showOutsideDays
 
-                                month={new Date(nextPeriod.predicted_date)}
+                                month={new Date(nextPeriod.predicted_period_date)}
 
                                 modifiers={{
-                                    period: [
-                                        new Date(nextPeriod.predicted_date + 'T00:00:00')
+                                    predictedPeriod: [
+                                        new Date(nextPeriod.predicted_period_date + 'T00:00:00')
                                     ],
 
-                                    periodLength: {
-                                        from: new Date(nextPeriod.predicted_date + 'T00:00:00'),
+                                    predictedPeriodLength: {
+                                        from: new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
                                         to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
+                                    },
+
+                                    currentPredictedPeriod: [
+                                        new Date(nextPeriod.current_period_start_date + 'T00:00:00')
+                                    ],
+
+                                    currentPredictedPeriodLength: {
+                                        from: new Date(nextPeriod.current_period_start_date + 'T00:00:00'),
+                                        to: new Date(nextPeriod.current_period_end_date + 'T00:00:00'),
                                     },
 
                                     fertile: {
                                         from: new Date(nextPeriod.fertile_window_start),
                                         to: new Date(nextPeriod.fertile_window_end),
+                                    },
+
+                                    postSafeDay: {
+                                    from: new Date(nextPeriod.post_safe_start + 'T00:00:00'),
+                                    to: new Date(nextPeriod.post_safe_end + 'T00:00:00'),
+                                    },
+
+                                    pretSafeDay: {
+                                        from: new Date(nextPeriod.pre_safe_start + 'T00:00:00'),
+                                        to: new Date(nextPeriod.pre_safe_end + 'T00:00:00'),
                                     },
 
                                     ovulation: [
@@ -225,11 +253,15 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 }}
 
                                 modifiersClassNames={{
-                                    period: 'bg-red-400 text-black rounded-full',
-                                    periodLength: 'bg-red-200 text-black rounded-full',
-                                    fertile: 'bg-blue-200 text-black rounded-full',
-                                    ovulation: '!bg-blue-500 text-white rounded-full',
-                                    pregnancy: '!bg-orange-200 text-black rounded-full',
+                                predictedPeriod: 'bg-red-400 text-black rounded-full',
+                                predictedPeriodLength: 'bg-red-200 text-black rounded-full',
+                                currentPredictedPeriod: 'bg-red-400 text-black rounded-full',
+                                currentPredictedPeriodLength: 'bg-red-200 text-black rounded-full',
+                                fertile: 'bg-sky-200 text-black rounded-full',
+                                ovulation: '!bg-blue-500 text-white rounded-full',
+                                pregnancy: '!bg-orange-200 text-black rounded-full',
+                                postSafeDay: 'bg-green-100 text-black rounded-full',
+                                pretSafeDay: 'bg-green-100 text-black rounded-full',
                                 }}
                             />
                         )}

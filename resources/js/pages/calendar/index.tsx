@@ -17,6 +17,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 type Cycle = {
     id: number;
     start_date: string;
+    period_length: number;
 };
 
 type BbtReading = {
@@ -34,12 +35,21 @@ type Symptom = {
 };
 
 type NextPeriod = {
-    predicted_date: string;
+    current_period_start_date: string;
+    current_period_end_date: string;
+
+    predicted_period_date: string;
     predicted_last_period_date: string;
     days_left: number;
 
     ovulation_date: string;
     ovulation_days_left: number;
+
+    post_safe_start: number;
+    post_safe_end: number;
+
+    pre_safe_start: number;
+    pre_safe_end: number;
 
     fertile_window_start: string;
     fertile_window_end: string;
@@ -87,7 +97,7 @@ export default function Calendar({
 
                             month={
                                 new Date(
-                                    nextPeriod.predicted_date + 'T00:00:00'
+                                    nextPeriod.predicted_period_date + 'T00:00:00'
                                 )
                             }
 
@@ -99,31 +109,55 @@ export default function Calendar({
 
                             modifiers={{
 
-                                period: [
-                                    new Date(nextPeriod.predicted_date + 'T00:00:00'),
+                                PredictedPeriod: [
+                                    new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
                                 ],
 
-                                periodLength: {
-                                        from: new Date(nextPeriod.predicted_date + 'T00:00:00'),
-                                        to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
-                                    },
+                                PredictedPeriodLength: {
+                                    from: new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
+                                    to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
+                                },
+
+                                currentPredictedPeriod: [
+                                    new Date(nextPeriod.current_period_start_date + 'T00:00:00')
+                                ],
+
+                                currentPredictedPeriodLength: {
+                                    from: new Date(nextPeriod.current_period_start_date + 'T00:00:00'),
+                                    to: new Date(nextPeriod.current_period_end_date + 'T00:00:00'),
+                                },
 
                                 fertile: {
                                     from: new Date(nextPeriod.fertile_window_start + 'T00:00:00'),
                                     to: new Date(nextPeriod.fertile_window_end + 'T00:00:00'),
                                 },
 
-                                ovulation: [new Date(nextPeriod.ovulation_date + 'T00:00:00'),],
+                                postSafeDay: {
+                                    from: new Date(nextPeriod.post_safe_start + 'T00:00:00'),
+                                    to: new Date(nextPeriod.post_safe_end + 'T00:00:00'),
+                                },
 
-                                pregnancy: [ new Date(nextPeriod.pregnancy_test_date + 'T00:00:00'),],
+                                pretSafeDay: {
+                                    from: new Date(nextPeriod.pre_safe_start + 'T00:00:00'),
+                                    to: new Date(nextPeriod.pre_safe_end + 'T00:00:00'),
+                                },
+
+                                ovulation: [new Date(nextPeriod.ovulation_date + 'T00:00:00'),],
+                                pregnancy: [new Date(nextPeriod.pregnancy_test_date + 'T00:00:00'),],
+
+
                             }}
 
                             modifiersClassNames={{
-                                period: 'bg-red-400 text-black rounded-full',
-                                periodLength: 'bg-red-200 text-black rounded-full',
+                                PredictedPeriod: 'bg-red-400 text-black rounded-full',
+                                PredictedPeriodLength: 'bg-red-200 text-black rounded-full',
+                                currentPredictedPeriod: 'bg-red-400 text-black rounded-full',
+                                currentPredictedPeriodLength: 'bg-red-200 text-black rounded-full',
                                 fertile: 'bg-sky-200 text-black rounded-full',
                                 ovulation: '!bg-blue-500 text-white rounded-full',
                                 pregnancy: '!bg-orange-200 text-black rounded-full',
+                                postSafeDay: 'bg-green-200 text-black rounded-full',
+                                pretSafeDay: 'bg-green-200 text-black rounded-full',
                             }}
                         />
                     )}

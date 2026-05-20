@@ -6,6 +6,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\Request;
 use App\Services\CyclePredictionService;
+use App\Services\CycleHistoryService;
 
 class CalendarController extends Controller
 {
@@ -13,7 +14,10 @@ class CalendarController extends Controller
      * Display the main calendar view.
      * This is what loads when you visit /calendar
      */
-    public function index(CyclePredictionService $predictionService)
+    public function index(
+        CyclePredictionService $predictionService,
+        CycleHistoryService $historyService
+    )
     {
         $user = auth()->user();
 
@@ -25,14 +29,36 @@ class CalendarController extends Controller
 
         $symptoms = $user->symptoms()->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard-style prediction
+        |--------------------------------------------------------------------------
+        */
+
         $nextPeriod = $predictionService
             ->predictNextPeriod($cycles);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Full calendar computed history
+        |--------------------------------------------------------------------------
+        */
+
+        $calendarData = $historyService
+            ->buildCalendarData($cycles);
+
+        // dd($calendarData);
 
         return Inertia::render('calendar/index', [
             'cycles' => $cycles,
             'bbtReadings' => $bbtReadings,
             'symptoms' => $symptoms,
+
+            // Small summary prediction
             'nextPeriod' => $nextPeriod,
+
+            // Full computed calendar
+            'calendarData' => $calendarData,
         ]);
     }
 
@@ -41,8 +67,7 @@ class CalendarController extends Controller
      */
     public function create() 
     {
-        // For Inertia, you usually handle this with a Modal on the index page,
-        // but the method needs to exist if you're using resource.
+        //
     }
 
     /**
@@ -50,15 +75,15 @@ class CalendarController extends Controller
      */
     public function store(Request $request)
     {
-        // Logic to save a new cycle/event
+        //
     }
 
     /**
-     * Update the specified resource in storage (e.g., changing a date).
+     * Update the specified resource in storage.
      */
     public function update(Request $request, $id)
     {
-        // Logic to update the cycle dates
+        //
     }
 
     /**
@@ -66,6 +91,6 @@ class CalendarController extends Controller
      */
     public function destroy($id)
     {
-        // Logic to delete a cycle
+        //
     }
 }
