@@ -9,23 +9,246 @@ class CyclePredictionService
 {
     public function predictNextPeriod(Collection $cycles): ?array
     {
-        // Need at least 2 cycles to calculate length
         if ($cycles->count() < 2) {
             return null;
         }
 
-        // Sort by start_date ascending
+        $sorted = $cycles->sortBy('start_date')->values();
+
+        $latestCycle = $sorted->last();
+
+        $currentPeriodStartDate = Carbon::parse(
+            $latestCycle->start_date
+        );
+
+        $currentPeriodLength = $latestCycle->period_length ?? 5;
+
+        $currentPeriodEndDate = $currentPeriodStartDate
+            ->copy()
+            ->addDays($currentPeriodLength - 1);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Centralized Prediction Engine
+        |--------------------------------------------------------------------------
+        */
+
+        $prediction = $this->buildPredictionFromCycle(
+            $sorted,
+            $currentPeriodStartDate,
+            $currentPeriodLength
+        );
+
+        if (!$prediction) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Days Left
+        |--------------------------------------------------------------------------
+        */
+
+        $daysLeft = now()
+            ->startOfDay()
+            ->diffInDays(
+                $prediction['predicted_period_start'],
+                false
+            );
+
+        $ovulationDaysLeft = now()
+            ->startOfDay()
+            ->diffInDays(
+                $prediction['ovulation_date'],
+                false
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pregnancy Test
+        |--------------------------------------------------------------------------
+        */
+
+        $pregnancyTestDate = $prediction[
+            'predicted_period_start'
+        ]
+            ->copy()
+            ->addDays(1);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recent Cycle Statistics
+        |--------------------------------------------------------------------------
+        */
+
+        $lengths = [];
+
+        for ($i = 1; $i < $sorted->count(); $i++) {
+
+            $previous = Carbon::parse(
+                $sorted[$i - 1]->start_date
+            );
+
+            $current = Carbon::parse(
+                $sorted[$i]->start_date
+            );
+
+            $lengths[] = $previous->diffInDays($current);
+        }
+
+        $sliceLength =
+            count($lengths) >= 6
+                ? -6
+                : -count($lengths);
+
+        $recentLengths = array_slice(
+            $lengths,
+            $sliceLength
+        );
+
+        $periodLengths = $sorted
+            ->pluck('period_length')
+            ->filter()
+            ->toArray();
+
+        $recentPeriodLengths = array_slice(
+            $periodLengths,
+            $sliceLength
+        );
+
+        $averageCycleLength = round(
+            array_sum($recentLengths) /
+            count($recentLengths)
+        );
+
+        $averagePeriodLength = round(
+            array_sum($recentPeriodLengths) /
+            count($recentPeriodLengths)
+        );
+
+
+        return [
+
+            /*
+            |--------------------------------------------------------------------------
+            | Current Period
+            |--------------------------------------------------------------------------
+            */
+
+            'current_period_start_date' =>
+                $currentPeriodStartDate->toDateString(),
+
+            'current_period_end_date' =>
+                $currentPeriodEndDate->toDateString(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Predicted Period
+            |--------------------------------------------------------------------------
+            */
+
+            'predicted_period_date' =>
+                $prediction['predicted_period_start']
+                    ->toDateString(),
+
+            'predicted_last_period_date' =>
+                $prediction['predicted_period_end']
+                    ->toDateString(),
+
+            'days_left' =>
+                $daysLeft,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Ovulation
+            |--------------------------------------------------------------------------
+            */
+
+            'ovulation_date' =>
+                $prediction['ovulation_date']
+                    ->toDateString(),
+
+            'ovulation_days_left' =>
+                $ovulationDaysLeft,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Fertile Window
+            |--------------------------------------------------------------------------
+            */
+
+            'fertile_window_start' =>
+                $prediction['fertile_start']
+                    ->toDateString(),
+
+            'fertile_window_end' =>
+                $prediction['fertile_end']
+                    ->toDateString(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Safe Days
+            |--------------------------------------------------------------------------
+            */
+
+            'post_safe_start' =>
+                $prediction['post_safe_start']
+                    ->toDateString(),
+
+            'post_safe_end' =>
+                $prediction['post_safe_end']
+                    ->toDateString(),
+
+            'pre_safe_start' =>
+                $prediction['pre_safe_start']
+                    ->toDateString(),
+
+            'pre_safe_end' =>
+                $prediction['pre_safe_end']
+                    ->toDateString(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Meta
+            |--------------------------------------------------------------------------
+            */
+
+            'average_cycle_length' =>
+                $averageCycleLength,
+
+            'average_period_length' =>
+                $averagePeriodLength,
+
+            'shortest_cycle' =>
+                min($recentLengths),
+
+            'longest_cycle' =>
+                max($recentLengths),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pregnancy Test
+            |--------------------------------------------------------------------------
+            */
+
+            'pregnancy_test_date' =>
+                $pregnancyTestDate->toDateString(),
+        ];
+    }
+
+    public function buildPredictionFromCycle(
+        Collection $cycles,
+        Carbon $cycleStartDate
+    ): ?array
+    {
+        if ($cycles->count() < 2) {
+            return null;
+        }
+
         $sorted = $cycles->sortBy('start_date')->values();
 
         $lengths = [];
-        $periodLengths = $sorted->pluck('period_length')->filter()->toArray();
-        
-        $currentPeriodEndLengths = $sorted->last()->period_length;
-        $currentPeriodStartDate = Carbon::parse($sorted->last()->start_date);
-        $currentPeriodEndDate = $currentPeriodStartDate->copy()
-            ->addDays($currentPeriodEndLengths > 0 ? $currentPeriodEndLengths - 1 : 0);
 
-        // Calculate cycle lengths
         for ($i = 1; $i < $sorted->count(); $i++) {
 
             $previous = Carbon::parse($sorted[$i - 1]->start_date);
@@ -34,126 +257,107 @@ class CyclePredictionService
             $lengths[] = $previous->diffInDays($current);
         }
 
-        // counts the total lengts
         $totalCycles = count($lengths);
 
-        // Use last 6 cycle lengths, if not, use what available
         $sliceLength = $totalCycles >= 6 ? -6 : -$totalCycles;
+
         $recentLengths = array_slice($lengths, $sliceLength);
-        $periodRecentLengths = array_slice($periodLengths, $sliceLength);
 
-        // calculate the average cycle days safely
-        $averageLength = $totalCycles > 0 
-            ? round(array_sum($recentLengths) / count($recentLengths)) 
-            : 0;
+        $periodLengths = $sorted
+            ->pluck('period_length')
+            ->filter()
+            ->toArray();
 
-        // calculate the period length cycle days safely
-        $averagePeriodLength = $totalCycles > 0 
-            ? round(array_sum($periodRecentLengths) / count($periodRecentLengths)) 
-            : 0;
+        $recentPeriodLengths = array_slice($periodLengths, $sliceLength);
 
-        // Latest cycle start
-        $latestCycle = $sorted->last();
+        $averagePeriodLength = count($recentPeriodLengths) > 0
+            ? round(array_sum($recentPeriodLengths) / count($recentPeriodLengths))
+            : 5;
 
-        $predictedDate = Carbon::parse($latestCycle->start_date)
-            ->addDays($averageLength);
+        $averageLength = round(
+            array_sum($recentLengths) / count($recentLengths)
+        );
 
-        $predictedLastPeriodDate = $predictedDate
-            ->copy()
-            ->addDays($averagePeriodLength > 0 ? $averagePeriodLength - 1 : 0);
-
-        // Ovulation
-        $ovulationDate = $predictedDate->copy()->subDays(14);
-
-        $fertileWindowStart = $ovulationDate->copy()->subDays(5);
-
-        $fertileWindowEnd = $ovulationDate->copy();
-
-        // Pregnancy test
-        $recommendedPregnancyTestDate = $predictedDate->copy()->addDays(1);
-
-        // =======================================
-        // SAFE DAY CALCULATIONS
-        // =======================================
-
-        // Use actual cycle history
         $shortestCycle = min($recentLengths);
+
         $longestCycle = max($recentLengths);
 
-        // POST-MENSTRUAL SAFE DAYS
-        // Formula:
-        // shortest cycle - 14 ovulation - 5 fertile window - 1 buffer
+        /*
+        |--------------------------------------------------------------------------
+        | Predicted Period
+        |--------------------------------------------------------------------------
+        */
+
+        $predictedPeriodStart = $cycleStartDate
+            ->copy()
+            ->addDays($averageLength);
+
+        $predictedPeriodEnd = $predictedPeriodStart
+            ->copy()
+            ->addDays($averagePeriodLength - 1);
+        
+        /*
+        |--------------------------------------------------------------------------
+        | Ovulation
+        |--------------------------------------------------------------------------
+        */
+
+        $ovulationDate = $predictedPeriodStart
+            ->copy()
+            ->subDays(14);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fertile Window
+        |--------------------------------------------------------------------------
+        */
+
+        $fertileStart = $ovulationDate
+            ->copy()
+            ->subDays(5);
+
+        $fertileEnd = $ovulationDate->copy();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safe Days
+        |--------------------------------------------------------------------------
+        */
+
         $postSafeEndOffset = $shortestCycle - 20;
 
-        // Safe day starts AFTER period ends
-        $currentPostPeriodSafeStart = $currentPeriodStartDate->copy();
+        $postSafeStart = $cycleStartDate->copy();
 
-        // PRE-MENSTRUAL SAFE DAYS
-        // Continues until the estimated safe window
-        // of the next predicted cycle.
-        //
-        // This is temporary and will be recalculated
-        // once the next real period is logged.
-        $postSafeEnd = $currentPeriodStartDate
+        $postSafeEnd = $cycleStartDate
             ->copy()
             ->addDays($postSafeEndOffset - 1);
 
-        // PRE-MENSTRUAL SAFE DAYS
-        // Formula:
-        // longest cycle - 14 + 4 buffer
         $preSafeStartOffset = $longestCycle - 10;
 
-        // Start after ovulation buffer
-        $preSafeStart = $currentPeriodStartDate
+        $preSafeStart = $cycleStartDate
             ->copy()
             ->addDays($preSafeStartOffset);
 
-        // End after the predicted period
-        $preSafeEnd = $predictedDate
-        ->copy()
-        ->addDays($postSafeEndOffset - 1);
-
-        // =======================================
-
-        $ovulationDaysLeft = now()->startOfDay()
-            ->diffInDays($ovulationDate, false);
-
-        $daysLeft = now()->startOfDay()
-            ->diffInDays($predictedDate, false);
+        $preSafeEnd = $predictedPeriodStart
+            ->copy()
+            ->addDays($postSafeEndOffset - 1);
 
         return [
-            // Current Period
-            'current_period_start_date' => $currentPeriodStartDate->toDateString(),
-            'current_period_end_date' => $currentPeriodEndDate->toDateString(),
+            'predicted_period_start' => $predictedPeriodStart,
+            'predicted_period_end' => $predictedPeriodEnd,
 
-            // Next Period
-            'predicted_period_date' => $predictedDate->toDateString(),
-            'predicted_last_period_date' => $predictedLastPeriodDate->toDateString(),
-            'days_left' => $daysLeft,
+            'ovulation_date' => $ovulationDate,
 
-            // Ovulation
-            'ovulation_date' => $ovulationDate->toDateString(),
-            'ovulation_days_left' => $ovulationDaysLeft,
+            'fertile_start' => $fertileStart,
+            'fertile_end' => $fertileEnd,
 
-            // Fertile Window
-            'fertile_window_start' => $fertileWindowStart->toDateString(),
-            'fertile_window_end' => $fertileWindowEnd->toDateString(),
+            'post_safe_start' => $postSafeStart,
+            'post_safe_end' => $postSafeEnd,
 
-            // Safe Days
-            'post_safe_start' => $currentPostPeriodSafeStart->toDateString(),
-            'post_safe_end' => $postSafeEnd->toDateString(),
+            'pre_safe_start' => $preSafeStart,
+            'pre_safe_end' => $preSafeEnd,
 
-            'pre_safe_start' => $preSafeStart->toDateString(),
-            'pre_safe_end' => $preSafeEnd->toDateString(),
-
-            // Meta
-            'average_cycle_length' => $averageLength,
             'average_period_length' => $averagePeriodLength,
-            'shortest_cycle' => $shortestCycle,
-            'longest_cycle' => $longestCycle,
-
-            // Pregnancy test
-            'pregnancy_test_date' => $recommendedPregnancyTestDate->toDateString(),
         ];
     }
 }

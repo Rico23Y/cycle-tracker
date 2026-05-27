@@ -7,6 +7,11 @@ use Illuminate\Support\Collection;
 
 class CycleHistoryService
 {
+
+    public function __construct(
+        protected CyclePredictionService $predictionService
+    ) {}
+
     public function buildCalendarData(Collection $cycles): array
     {
         if ($cycles->count() < 2) {
@@ -24,19 +29,7 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
-        $cycleLengths = [];
 
-        for ($i = 1; $i < $sorted->count(); $i++) {
-
-            $previous = Carbon::parse($sorted[$i - 1]->start_date);
-            $current = Carbon::parse($sorted[$i]->start_date);
-
-            $cycleLengths[] = $previous->diffInDays($current);
-        }
-
-        $averageCycleLength = round(
-            array_sum($cycleLengths) / count($cycleLengths)
-        );
 
         /*
         |--------------------------------------------------------------------------
@@ -64,11 +57,21 @@ class CycleHistoryService
                 $calendarDays[$key][] = [
                     'type' => 'actual_period',
                     'label' => 'Actual Period',
-                    'color' => 'red',
+                    'color' => 'pink',
                     'editable' => true,
                 ];
+
+                if ($d === 0) {
+                    $calendarDays[$key][] = [
+                        'type' => 'day_one_actual_period',
+                        'label' => 'Day One',
+                        'color' => 'red',
+                        'editable' => true,
+                    ];
+                }
             }
         }
+        
 
         /*
         |--------------------------------------------------------------------------
@@ -79,13 +82,23 @@ class CycleHistoryService
 
         $latestCycle = $sorted->last();
 
-        $latestStart = Carbon::parse($latestCycle->start_date);
+        $currentPeriodStart = Carbon::parse(
+            $latestCycle->start_date
+        );
 
-        $predictedStart = $latestStart
-            ->copy()
-            ->addDays($averageCycleLength);
+        $currentPeriodLength =
+            $latestCycle->period_length ?? 5;
 
-        $predictedPeriodLength = $latestCycle->period_length ?? 5;
+        $prediction = $this->predictionService
+            ->buildPredictionFromCycle(
+                $sorted,
+                $currentPeriodStart,
+                $currentPeriodLength
+            );
+
+        if (!$prediction) {
+            return $calendarDays;
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -93,9 +106,11 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
-        for ($d = 0; $d < $predictedPeriodLength; $d++) {
+        for ($d = 0; $d < $prediction['average_period_length']; $d++) {
 
-            $date = $predictedStart->copy()->addDays($d);
+            $date = $prediction['predicted_period_start']
+                ->copy()
+                ->addDays($d);
 
             $key = $date->toDateString();
 
@@ -106,9 +121,18 @@ class CycleHistoryService
             $calendarDays[$key][] = [
                 'type' => 'predicted_period',
                 'label' => 'Predicted Period',
-                'color' => 'pink',
+                'color' => 'light_pink',
                 'editable' => true,
             ];
+
+            if ($d === 0) {
+                $calendarDays[$key][] = [
+                    'type' => 'day_one_predicted_period',
+                    'label' => 'Predicted Day One',
+                    'color' => 'light_red',
+                    'editable' => true,
+                ];
+            }
         }
 
         /*
@@ -117,9 +141,7 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
-        $ovulationDate = $predictedStart
-            ->copy()
-            ->subDays(14);
+        $ovulationDate = $prediction['ovulation_date'];
 
         $key = $ovulationDate->toDateString();
 
@@ -139,11 +161,12 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
-        $fertileStart = $ovulationDate->copy()->subDays(5);
 
         for ($d = 0; $d <= 5; $d++) {
 
-            $date = $fertileStart->copy()->addDays($d);
+            $date = $prediction['fertile_start']
+                ->copy()
+                ->addDays($d);
 
             $key = $date->toDateString();
 
@@ -158,6 +181,66 @@ class CycleHistoryService
             ];
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Predicted Safe Days
+        |--------------------------------------------------------------------------
+        */
+
+        $safeRanges = [
+            [
+                'start' => $prediction['post_safe_start'],
+                'end' => $prediction['post_safe_end'],
+            ],
+            [
+                'start' => $prediction['pre_safe_start'],
+                'end' => $prediction['pre_safe_end'],
+            ],
+        ];
+
+        foreach ($safeRanges as $range) {
+            for (
+                $date = $range['start']->copy();
+                $date->lte($range['end']);
+                $date->addDay()
+            ) {
+                $key = $date->toDateString();
+
+                if (!isset($calendarDays[$key])) {
+                    $calendarDays[$key] = [];
+                }
+
+                $calendarDays[$key][] = [
+                    'type' => 'predicted_safe_day',
+                    'label' => 'Potential Safe Day',
+                    'color' => 'light_green',
+                ];
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pregnancy Test Reminder
+        |--------------------------------------------------------------------------
+        */
+
+        $pregnancyTestDate = $prediction['predicted_period_start']
+            ->copy()
+            ->addDays(1);
+
+        $key = $pregnancyTestDate->toDateString();
+
+        if (!isset($calendarDays[$key])) {
+            $calendarDays[$key] = [];
+        }
+
+        $calendarDays[$key][] = [
+            'type' => 'pregnancy_test',
+            'label' => 'Take PPT when missed period',
+            'color' => 'light_orange',
+        ];
+
+        // dd($calendarDays);
         return $calendarDays;
     }
 }
