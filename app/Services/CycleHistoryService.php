@@ -12,7 +12,11 @@ class CycleHistoryService
         protected CyclePredictionService $predictionService
     ) {}
 
-    public function buildCalendarData(Collection $cycles): array
+    public function buildCalendarData(
+        Collection $cycles,
+        Collection $bbtReadings,
+        Collection $symptoms
+    ): array
     {
         if ($cycles->count() < 2) {
             return [];
@@ -21,6 +25,18 @@ class CycleHistoryService
         $sorted = $cycles->sortBy('start_date')->values();
 
         $calendarDays = [];
+
+        $latestCycle = $sorted->last();
+
+        $currentPeriodStart = Carbon::parse(
+            $latestCycle->start_date
+        );
+
+        $prediction = $this->predictionService
+            ->buildPredictionFromCycle(
+                $sorted,
+                $currentPeriodStart,
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -38,11 +54,76 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
+        $latestCycleId = $sorted->last()->id;
+
         foreach ($sorted as $cycle) {
 
             $start = Carbon::parse($cycle->start_date);
 
-            $periodLength = $cycle->period_length ?? 5;
+            $isLatestCycle = $cycle->id === $latestCycleId;
+
+            /*
+            |--------------------------------------------------------------------------
+            | If period_length is null, the period is still ongoing.
+            |--------------------------------------------------------------------------
+            */
+
+            if ($cycle->period_length === null) {
+
+                $estimatedPeriodLength = $isLatestCycle && $prediction
+                    ? $prediction['average_period_length']
+                    : 1;
+
+                for ($d = 0; $d < $estimatedPeriodLength; $d++) {
+
+                    $date = $start->copy()->addDays($d);
+
+                    $key = $date->toDateString();
+
+                    if (!isset($calendarDays[$key])) {
+                        $calendarDays[$key] = [];
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Estimated ongoing actual period
+                    |--------------------------------------------------------------------------
+                    | This is only visual. It does NOT update the database.
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $calendarDays[$key][] = [
+                        'type' => 'ongoing_actual_period',
+                        'label' => 'Ongoing Period',
+                        'color' => 'pink',
+                        'editable' => true,
+                        'cycle_id' => $cycle->id,
+                        'is_latest_cycle' => $isLatestCycle,
+                        'is_estimated' => true,
+                    ];
+
+                    if ($d === 0) {
+                        $calendarDays[$key][] = [
+                            'type' => 'day_one_actual_period',
+                            'label' => 'Day One',
+                            'color' => 'red',
+                            'editable' => true,
+                            'cycle_id' => $cycle->id,
+                            'is_latest_cycle' => $isLatestCycle,
+                        ];
+                    }
+                }
+
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Confirmed actual period.
+            |--------------------------------------------------------------------------
+            */
+
+            $periodLength = $cycle->period_length;
 
             for ($d = 0; $d < $periodLength; $d++) {
 
@@ -59,6 +140,8 @@ class CycleHistoryService
                     'label' => 'Actual Period',
                     'color' => 'pink',
                     'editable' => true,
+                    'cycle_id' => $cycle->id,
+                    'is_latest_cycle' => $isLatestCycle,
                 ];
 
                 if ($d === 0) {
@@ -67,6 +150,8 @@ class CycleHistoryService
                         'label' => 'Day One',
                         'color' => 'red',
                         'editable' => true,
+                        'cycle_id' => $cycle->id,
+                        'is_latest_cycle' => $isLatestCycle,
                     ];
                 }
             }
@@ -79,22 +164,6 @@ class CycleHistoryService
         | Build FUTURE PREDICTIONS
         |--------------------------------------------------------------------------
         */
-
-        $latestCycle = $sorted->last();
-
-        $currentPeriodStart = Carbon::parse(
-            $latestCycle->start_date
-        );
-
-        $currentPeriodLength =
-            $latestCycle->period_length ?? 5;
-
-        $prediction = $this->predictionService
-            ->buildPredictionFromCycle(
-                $sorted,
-                $currentPeriodStart,
-                $currentPeriodLength
-            );
 
         if (!$prediction) {
             return $calendarDays;
@@ -123,6 +192,7 @@ class CycleHistoryService
                 'label' => 'Predicted Period',
                 'color' => 'light_pink',
                 'editable' => true,
+                'is_prediction' => true,
             ];
 
             if ($d === 0) {
@@ -131,6 +201,7 @@ class CycleHistoryService
                     'label' => 'Predicted Day One',
                     'color' => 'light_red',
                     'editable' => true,
+                    'is_prediction' => true,
                 ];
             }
         }
@@ -150,8 +221,8 @@ class CycleHistoryService
         }
 
         $calendarDays[$key][] = [
-            'type' => 'ovulation',
-            'label' => 'Ovulation',
+            'type' => 'predicted_ovulation',
+            'label' => 'Predicted Ovulation',
             'color' => 'blue',
         ];
 
@@ -175,8 +246,8 @@ class CycleHistoryService
             }
 
             $calendarDays[$key][] = [
-                'type' => 'fertile',
-                'label' => 'Fertile Window',
+                'type' => 'predicted_fertile_window',
+                'label' => 'Predicted Ovulation Window',
                 'color' => 'sky',
             ];
         }
@@ -239,6 +310,112 @@ class CycleHistoryService
             'label' => 'Take PPT when missed period',
             'color' => 'light_orange',
         ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Historical Ovulation + Fertile Windows
+        |--------------------------------------------------------------------------
+        */
+
+        for ($i = 1; $i < $sorted->count(); $i++) {
+
+            $nextCycleStart = Carbon::parse($sorted[$i]->start_date);
+
+            $historicalOvulationDate = $nextCycleStart
+                ->copy()
+                ->subDays(14);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Historical Fertile Window
+            |--------------------------------------------------------------------------
+            */
+
+            $historicalFertileStart = $historicalOvulationDate
+                ->copy()
+                ->subDays(5);
+
+            for ($d = 0; $d <= 5; $d++) {
+
+                $date = $historicalFertileStart
+                    ->copy()
+                    ->addDays($d);
+
+                $key = $date->toDateString();
+
+                if (!isset($calendarDays[$key])) {
+                    $calendarDays[$key] = [];
+                }
+
+                $calendarDays[$key][] = [
+                    'type' => 'fertile_window',
+                    'label' => 'Ovulation Window',
+                    'color' => 'sky',
+                ];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Historical Ovulation
+            |--------------------------------------------------------------------------
+            */
+
+            $key = $historicalOvulationDate->toDateString();
+
+            if (!isset($calendarDays[$key])) {
+                $calendarDays[$key] = [];
+            }
+
+            $calendarDays[$key][] = [
+                'type' => 'ovulation',
+                'label' => 'Ovulation',
+                'color' => 'blue',
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | BBT Readings
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($bbtReadings as $reading) {
+            $key = Carbon::parse($reading->date)->toDateString();
+
+            if (!isset($calendarDays[$key])) {
+                $calendarDays[$key] = [];
+            }
+
+            $calendarDays[$key][] = [
+                'type' => 'bbt',
+                'label' => $reading->temperature . '°C',
+                'color' => 'gray',
+                'temperature' => $reading->temperature,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Symptoms
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($symptoms as $symptom) {
+            $key = Carbon::parse($symptom->date)->toDateString();
+
+            if (!isset($calendarDays[$key])) {
+                $calendarDays[$key] = [];
+            }
+
+            $calendarDays[$key][] = [
+                'type' => 'symptom',
+                'label' => $symptom->type . ' ' . str_repeat('★', $symptom->level),
+                'color' => 'purple',
+                'symptom_type' => $symptom->type,
+                'level' => $symptom->level,
+                'notes' => $symptom->notes,
+            ];
+        }
 
         // dd($calendarDays);
         return $calendarDays;

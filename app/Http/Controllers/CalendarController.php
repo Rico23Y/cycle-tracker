@@ -45,7 +45,11 @@ class CalendarController extends Controller
         */
 
         $calendarData = $historyService
-            ->buildCalendarData($cycles);
+            ->buildCalendarData(
+                $cycles,
+                $bbtReadings,
+                $symptoms
+            );
 
         // dd($calendarData);
 

@@ -36,7 +36,6 @@ class CyclePredictionService
         $prediction = $this->buildPredictionFromCycle(
             $sorted,
             $currentPeriodStartDate,
-            $currentPeriodLength
         );
 
         if (!$prediction) {
