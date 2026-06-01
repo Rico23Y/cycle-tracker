@@ -3,64 +3,89 @@
 namespace App\Http\Controllers;
 
 use App\Models\Symptom;
-use App\Http\Requests\StoreSymptomRequest;
-use App\Http\Requests\UpdateSymptomRequest;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class SymptomController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        return Inertia::render('symptoms/index');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'date' => [
+                'required',
+                'date',
+            ],
+            'type' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+            'level' => [
+                'required',
+                'integer',
+                'min:1',
+                'max:5',
+            ],
+            'notes' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        auth()->user()->symptoms()->create([
+            'date' => $validated['date'],
+            'type' => $validated['type'],
+            'level' => $validated['level'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return back();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreSymptomRequest $request)
+    public function update(Request $request, Symptom $symptom)
     {
-        //
+        abort_unless($symptom->user_id === auth()->id(), 403);
+
+        $validated = $request->validate([
+            'type' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+            'level' => [
+                'required',
+                'integer',
+                'min:1',
+                'max:5',
+            ],
+            'notes' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        $symptom->update([
+            'type' => $validated['type'],
+            'level' => $validated['level'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return back();
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Symptom $symptom)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Symptom $symptom)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateSymptomRequest $request, Symptom $symptom)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Symptom $symptom)
     {
-        //
+        abort_unless($symptom->user_id === auth()->id(), 403);
+
+        $symptom->delete();
+
+        return back();
     }
 }

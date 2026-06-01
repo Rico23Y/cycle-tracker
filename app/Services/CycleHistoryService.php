@@ -390,6 +390,7 @@ class CycleHistoryService
                 'type' => 'bbt',
                 'label' => $reading->temperature . '°C',
                 'color' => 'gray',
+                'bbt_id' => $reading->id,
                 'temperature' => $reading->temperature,
             ];
         }
@@ -411,6 +412,7 @@ class CycleHistoryService
                 'type' => 'symptom',
                 'label' => $symptom->type . ' ' . str_repeat('★', $symptom->level),
                 'color' => 'purple',
+                'symptom_id' => $symptom->id,
                 'symptom_type' => $symptom->type,
                 'level' => $symptom->level,
                 'notes' => $symptom->notes,

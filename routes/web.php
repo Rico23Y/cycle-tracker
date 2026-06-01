@@ -6,6 +6,7 @@ use App\Http\Controllers\CycleController;
 use App\Http\Controllers\BbtReadingController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\InsightController;
+use App\Http\Controllers\SymptomController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -16,6 +17,7 @@ Route::inertia('/', 'welcome', [
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+    Route::resource('symptoms', SymptomController::class);
     Route::resource('cycles', CycleController::class);
     Route::resource('bbt', BbtReadingController::class);
     Route::resource('partners', PartnerController::class);

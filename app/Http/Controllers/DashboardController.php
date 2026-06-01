@@ -13,7 +13,7 @@ class DashboardController extends Controller
 
         $readings = $user->bbtReadings()
             ->orderBy('date', 'desc')
-            ->take(7)
+            ->take(60)
             ->get();
 
         $cycles = $user->cycles()

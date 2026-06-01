@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -37,11 +37,11 @@ type NextPeriod = {
     ovulation_date: string;
     ovulation_days_left: number;
 
-    post_safe_start: number;
-    post_safe_end: number;
+    post_safe_start: string;
+    post_safe_end: string;
 
-    pre_safe_start: number;
-    pre_safe_end: number;
+    pre_safe_start: string;
+    pre_safe_end: string;
 
     fertile_window_start: string;
     fertile_window_end: string;
@@ -59,10 +59,28 @@ type Props = {
 
 export default function Dashboard({ readings, nextPeriod }: Props) {
 
+    const chartRef = useRef<HTMLDivElement | null>(null);
+
+    const [chartWidth, setChartWidth] = useState(0);
+
     useEffect(() => {
-    console.log('Readings:', readings)
-    console.log('nextPeriod:', nextPeriod);
-    }, [readings, nextPeriod]);
+        if (!chartRef.current) return;
+
+        const observer = new ResizeObserver((entries) => {
+            setChartWidth(entries[0].contentRect.width);
+        });
+
+        observer.observe(chartRef.current);
+
+        return () => observer.disconnect();
+    }, []);
+
+    const visiblePointCount = useMemo(() => {
+        if (chartWidth >= 1200) return 30;
+        if (chartWidth >= 900) return 21;
+        if (chartWidth >= 600) return 14;
+        return 7;
+    }, [chartWidth]);
 
     const { data, setData, post, processing, reset } = useForm({
         temperature: '',
@@ -77,23 +95,24 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
     }
 
     const chartData = [...readings]
+        .slice(0, visiblePointCount)
         .reverse()
-        .map(r => ({
+        .map((r) => ({
             date: r.date,
-            temp: r.temperature,
+            temp: Number(r.temperature),
         }));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
 
-            <div className="flex flex-col gap-4 p-4">
+            <div className="grid gap-4 p-4">
 
                 {/* 1st tile */}
                 <div className="rounded-xl border p-4 space-y-4">
 
                     {/* 📈 Graph */}
-                    <div className="h-[200px]">
+                    <div ref={chartRef} className="h-[240px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData}>
                                 <XAxis 
@@ -147,13 +166,22 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                         </button>
                     </form>
 
+                    <h3 className="text-sm font-semibold">
+                        Temperature Trend
+                    </h3>
+
+                    <p className="text-xs text-muted-foreground">
+                        Showing last {chartData.length} readings
+                    </p>
+
                 </div>
                 
 
-                {/* 2nd tile */}
-                <div className="grid gap-4 md:grid-cols-2">
-                    <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
+                {/* Lower tiles */}
+                <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2 xl:grid-cols-3">
 
+                    {/* 2nd tile: Next Period */}
+                    <div className="min-h-[220px] rounded-xl border p-4 flex flex-col justify-center">
                         <h3 className="text-sm font-semibold mb-4">
                             Next Period
                         </h3>
@@ -177,7 +205,7 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 </div>
 
                                 <div className="font-medium">
-                                    {new Date(nextPeriod.predicted_period_date)
+                                    {new Date(nextPeriod.predicted_period_date + 'T00:00:00')
                                         .toLocaleDateString('en-US', {
                                             month: 'long',
                                             day: 'numeric',
@@ -190,95 +218,16 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                 No cycle prediction available
                             </div>
                         )}
-
-                    </div>                  
-
-                    {/* 4th tile */}
-                    <div className="border rounded-xl p-4 md:row-span-2 flex flex-col justify-between">
-
-                        <h3 className="text-sm font-semibold mb-4">
-                            Cycle Calendar
-                        </h3>
-
-                        {nextPeriod && (
-                            <DayPicker
-                                disableNavigation
-                                hideNavigation
-                                fixedWeeks
-                                showOutsideDays
-
-                                month={new Date(nextPeriod.predicted_period_date)}
-
-                                modifiers={{
-                                    predictedPeriod: [
-                                        new Date(nextPeriod.predicted_period_date + 'T00:00:00')
-                                    ],
-
-                                    predictedPeriodLength: {
-                                        from: new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
-                                        to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
-                                    },
-
-                                    currentPredictedPeriod: [
-                                        new Date(nextPeriod.current_period_start_date + 'T00:00:00')
-                                    ],
-
-                                    currentPredictedPeriodLength: {
-                                        from: new Date(nextPeriod.current_period_start_date + 'T00:00:00'),
-                                        to: new Date(nextPeriod.current_period_end_date + 'T00:00:00'),
-                                    },
-
-                                    fertile: {
-                                        from: new Date(nextPeriod.fertile_window_start),
-                                        to: new Date(nextPeriod.fertile_window_end),
-                                    },
-
-                                    postSafeDay: {
-                                    from: new Date(nextPeriod.post_safe_start + 'T00:00:00'),
-                                    to: new Date(nextPeriod.post_safe_end + 'T00:00:00'),
-                                    },
-
-                                    pretSafeDay: {
-                                        from: new Date(nextPeriod.pre_safe_start + 'T00:00:00'),
-                                        to: new Date(nextPeriod.pre_safe_end + 'T00:00:00'),
-                                    },
-
-                                    ovulation: [
-                                        new Date(nextPeriod.ovulation_date),
-                                    ],
-
-                                    pregnancy: [
-                                        new Date(nextPeriod.pregnancy_test_date),
-                                    ],
-                                }}
-
-                                modifiersClassNames={{
-                                predictedPeriod: 'bg-red-400 text-black rounded-full',
-                                predictedPeriodLength: 'bg-red-200 text-black rounded-full',
-                                currentPredictedPeriod: 'bg-red-400 text-black rounded-full',
-                                currentPredictedPeriodLength: 'bg-red-200 text-black rounded-full',
-                                fertile: 'bg-sky-200 text-black rounded-full',
-                                ovulation: '!bg-blue-500 text-white rounded-full',
-                                pregnancy: '!bg-orange-200 text-black rounded-full',
-                                postSafeDay: 'bg-green-100 text-black rounded-full',
-                                pretSafeDay: 'bg-green-100 text-black rounded-full',
-                                }}
-                            />
-                        )}
-
                     </div>
 
-                    {/* 3rd tile */}                    
-                    <div className="aspect-video border rounded-xl p-4 flex flex-col justify-center">
-
+                    {/* 3rd tile: Ovulation Window */}
+                    <div className="min-h-[220px] rounded-xl border p-4 flex flex-col justify-center">
                         <h3 className="text-sm font-semibold mb-4">
                             Ovulation Window
                         </h3>
 
                         {nextPeriod ? (
                             <>
-
-                                {/* Days Left */}
                                 <div className="text-4xl font-bold">
                                     {nextPeriod.ovulation_days_left >= 0
                                         ? nextPeriod.ovulation_days_left
@@ -291,13 +240,12 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                         : 'days past ovulation'}
                                 </div>
 
-                                {/* Ovulation Date */}
                                 <div className="mt-4 text-sm">
                                     Ovulation Date
                                 </div>
 
                                 <div className="font-medium">
-                                    {new Date(nextPeriod.ovulation_date)
+                                    {new Date(nextPeriod.ovulation_date + 'T00:00:00')
                                         .toLocaleDateString('en-US', {
                                             month: 'long',
                                             day: 'numeric',
@@ -305,29 +253,95 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                         })}
                                 </div>
 
-                                {/* Fertile Window */}
                                 <div className="mt-4 text-sm">
                                     Fertile Window Starts
                                 </div>
 
                                 <div className="font-medium">
-                                    {new Date(nextPeriod.fertile_window_start)
+                                    {new Date(nextPeriod.fertile_window_start + 'T00:00:00')
                                         .toLocaleDateString('en-US', {
                                             month: 'long',
                                             day: 'numeric',
                                             year: 'numeric',
                                         })}
                                 </div>
-
                             </>
                         ) : (
                             <div className="text-sm text-muted-foreground">
                                 No ovulation prediction available
                             </div>
                         )}
+                    </div>
 
-                    </div>  
+                    {/* 4th tile: Small Calendar */}
+                    <div className="min-h-[220px] rounded-xl border p-4">
+                        <h3 className="text-sm font-semibold mb-4">
+                            Cycle Calendar
+                        </h3>
 
+                        {nextPeriod && (
+                            <DayPicker
+                                disableNavigation
+                                hideNavigation
+                                fixedWeeks
+                                showOutsideDays
+                                month={new Date(nextPeriod.predicted_period_date + 'T00:00:00')}
+                                modifiers={{
+                                    predictedPeriod: [
+                                        new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
+                                    ],
+
+                                    predictedPeriodLength: {
+                                        from: new Date(nextPeriod.predicted_period_date + 'T00:00:00'),
+                                        to: new Date(nextPeriod.predicted_last_period_date + 'T00:00:00'),
+                                    },
+
+                                    currentPredictedPeriod: [
+                                        new Date(nextPeriod.current_period_start_date + 'T00:00:00'),
+                                    ],
+
+                                    currentPredictedPeriodLength: {
+                                        from: new Date(nextPeriod.current_period_start_date + 'T00:00:00'),
+                                        to: new Date(nextPeriod.current_period_end_date + 'T00:00:00'),
+                                    },
+
+                                    fertile: {
+                                        from: new Date(nextPeriod.fertile_window_start + 'T00:00:00'),
+                                        to: new Date(nextPeriod.fertile_window_end + 'T00:00:00'),
+                                    },
+
+                                    postSafeDay: {
+                                        from: new Date(nextPeriod.post_safe_start + 'T00:00:00'),
+                                        to: new Date(nextPeriod.post_safe_end + 'T00:00:00'),
+                                    },
+
+                                    preSafeDay: {
+                                        from: new Date(nextPeriod.pre_safe_start + 'T00:00:00'),
+                                        to: new Date(nextPeriod.pre_safe_end + 'T00:00:00'),
+                                    },
+
+                                    ovulation: [
+                                        new Date(nextPeriod.ovulation_date + 'T00:00:00'),
+                                    ],
+
+                                    pregnancy: [
+                                        new Date(nextPeriod.pregnancy_test_date + 'T00:00:00'),
+                                    ],
+                                }}
+                                modifiersClassNames={{
+                                    predictedPeriod: 'bg-red-400 text-black rounded-full',
+                                    predictedPeriodLength: 'bg-red-200 text-black rounded-full',
+                                    currentPredictedPeriod: 'bg-red-400 text-black rounded-full',
+                                    currentPredictedPeriodLength: 'bg-red-200 text-black rounded-full',
+                                    fertile: 'bg-sky-200 text-black rounded-full',
+                                    ovulation: '!bg-blue-500 text-white rounded-full',
+                                    pregnancy: '!bg-orange-200 text-black rounded-full',
+                                    postSafeDay: 'bg-green-100 text-black rounded-full',
+                                    preSafeDay: 'bg-green-100 text-black rounded-full',
+                                }}
+                            />
+                        )}
+                    </div>
 
                 </div>
 

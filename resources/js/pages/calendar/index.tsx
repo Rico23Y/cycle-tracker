@@ -33,29 +33,6 @@ type Symptom = {
     notes: string | null;
 };
 
-type NextPeriod = {
-    current_period_start_date: string;
-    current_period_end_date: string;
-
-    predicted_period_date: string;
-    predicted_last_period_date: string;
-    days_left: number;
-
-    ovulation_date: string;
-    ovulation_days_left: number;
-
-    post_safe_start: string;
-    post_safe_end: string;
-
-    pre_safe_start: string;
-    pre_safe_end: string;
-
-    fertile_window_start: string;
-    fertile_window_end: string;
-
-    pregnancy_test_date: string;
-};
-
 type CalendarEvent = {
     type: string;
     label: string;
@@ -66,7 +43,10 @@ type CalendarEvent = {
     is_latest_cycle?: boolean;
     is_estimated?: boolean;
 
+    bbt_id?: number;
     temperature?: number;
+
+    symptom_id?: number;
     symptom_type?: string;
     level?: number;
     notes?: string | null;
@@ -80,8 +60,8 @@ type Props = {
     cycles: Cycle[];
     bbtReadings: BbtReading[];
     symptoms: Symptom[];
-    nextPeriod: NextPeriod | null;
     calendarData: CalendarData;
+    defaultMonth: string;
 };
 
 const COLOR_MAP = {
@@ -106,8 +86,8 @@ const getBgColor = (color: EventColor | string): string => {
 
 
 export default function Calendar({
-    nextPeriod,
     calendarData,
+    defaultMonth,
 }: Props) {
 
     const formatDateKey = (date: Date) => {
@@ -137,23 +117,44 @@ export default function Calendar({
         new Date()
     );
 
-    const [month, setMonth] = useState<Date>(
-        nextPeriod
-            ? new Date(nextPeriod.predicted_period_date + 'T00:00:00')
-            : new Date()
-    );
+    const initialMonth = defaultMonth
+        ? new Date(defaultMonth + 'T00:00:00')
+        : new Date();
+
+    const [month, setMonth] = useState<Date>(initialMonth);
 
     const [activeAction, setActiveAction] = useState<
         | 'move_day_one'
         | 'update_period_end'
         | 'add_actual_period'
+        | 'add_bbt'
+        | 'edit_bbt'
+        | 'add_symptom'
+        | 'edit_symptom'
         | null
     >(null);
 
+    const [symptomType, setSymptomType] = useState('');
+    const [customSymptomType, setCustomSymptomType] = useState('');
+    const [symptomLevel, setSymptomLevel] = useState('1');
+    const [symptomNotes, setSymptomNotes] = useState('');
+
+    const SYMPTOM_OPTIONS = [
+        'Cramps',
+        'Headache',
+        'Bloating',
+        'Fatigue',
+        'Acne',
+        'Mood Swings',
+        'Breast Tenderness',
+        'Back Pain',
+        'Nausea',
+        'Other',
+    ];
+
+    const [temperature, setTemperature] = useState('');
     const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
-
     const [actionDate, setActionDate] = useState('');
-
     const { errors } = usePage().props as {
         errors?: Record<string, string>;
     };
@@ -171,108 +172,99 @@ export default function Calendar({
                         Cycle Calendar
                     </h2>
 
-                    {nextPeriod && (
+                    <DayPicker
+                    
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        month={month}
+                        onMonthChange={setMonth}
+                        startMonth={firstCalendarMonth}
+                        endMonth={lastCalendarMonth}
+                        showOutsideDays
+                        fixedWeeks
+                        className="w-full"
 
-                        <DayPicker
-                        
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={setSelectedDate}
-                            month={month}
-                            onMonthChange={setMonth}
-                            startMonth={firstCalendarMonth}
-                            endMonth={lastCalendarMonth}
-                            showOutsideDays
-                            fixedWeeks
-                            className="w-full"
+                        classNames={{
+                            months: 'w-full',
+                            month: 'w-full',
+                            month_grid: 'w-full border-collapse',
+                            weekdays: 'grid grid-cols-7',
+                            week: 'grid grid-cols-7',
+                            day: 'p-1 align-top',
+                        }}
+                        components={{
+                            Day: (props) => {
 
-                            classNames={{
-                                months: 'w-full',
-                                month: 'w-full',
-                                month_grid: 'w-full border-collapse',
-                                weekdays: 'grid grid-cols-7',
-                                week: 'grid grid-cols-7',
-                                day: 'p-1 align-top',
-                            }}
-                            components={{
-                                Day: (props) => {
+                                const date = props.day.date;
+                                const key = formatDateKey(date);
+                                const events = calendarData[key] || [];
+                                const bbtEvent = events.find(event => event.type === 'bbt');
+                                const nonBbtEvents = events.filter(event => event.type !== 'bbt');
 
-                                    const date = props.day.date;
+                                return (
 
-                                    const key = formatDateKey(date);
+                                    <div
+                                        className="
+                                            h-24
+                                            border
+                                            p-1
+                                            flex
+                                            flex-col
+                                            gap-1
+                                            overflow-hidden
+                                            rounded-md
+                                            text-xs
+                                            hover:bg-muted/50
+                                            transition
+                                        "
+                                        onClick={() => setSelectedDate(date)}
+                                    >
 
-                                    const events = calendarData[key] || [];
+                                        {/* DAY NUMBER */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-semibold">
+                                                {date.getDate()}
+                                            </span>
 
-                                    const bbtEvent = events.find(event => event.type === 'bbt');
-
-                                    const nonBbtEvents = events.filter(event => event.type !== 'bbt');
-
-                                    console.log( key, date, events);
-
-                                    return (
-
-                                        <div
-                                            className="
-                                                h-24
-                                                border
-                                                p-1
-                                                flex
-                                                flex-col
-                                                gap-1
-                                                overflow-hidden
-                                                rounded-md
-                                                text-xs
-                                                hover:bg-muted/50
-                                                transition
-                                            "
-                                            onClick={() => setSelectedDate(date)}
-                                        >
-
-                                            {/* DAY NUMBER */}
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-semibold">
-                                                    {date.getDate()}
+                                            {bbtEvent?.temperature && (
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {Number(bbtEvent.temperature).toFixed(2)}°C
                                                 </span>
-
-                                                {bbtEvent?.temperature && (
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        {Number(bbtEvent.temperature).toFixed(2)}°C
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* EVENT BARS */}
-                                            <div className="flex flex-col gap-1">
-
-                                                {nonBbtEvents.map((event, index) => {
-
-                                                    let bgColor = getBgColor(event.color);
-
-                                                    return (
-                                                        <div
-                                                            key={index}
-                                                            title={event.label}
-                                                            className={`
-                                                                px-1
-                                                                py-0.5
-                                                                rounded
-                                                                truncate
-                                                                text-[10px]
-                                                                ${bgColor}
-                                                            `}
-                                                        >
-                                                            {event.label}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                            )}
                                         </div>
-                                    );
-                                }
-                            }}
 
-                        />
-                    )}
+                                        {/* EVENT BARS */}
+                                        <div className="flex flex-col gap-1">
+
+                                            {nonBbtEvents.map((event, index) => {
+
+                                                let bgColor = getBgColor(event.color);
+
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        title={event.label}
+                                                        className={`
+                                                            px-1
+                                                            py-0.5
+                                                            rounded
+                                                            truncate
+                                                            text-[10px]
+                                                            ${bgColor}
+                                                        `}
+                                                    >
+                                                        {event.label}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        }}
+
+                    />
                 </div>
 
                 {/* RIGHT: SIDE PANEL */}
@@ -290,6 +282,18 @@ export default function Calendar({
 
                             const selectedEvents =
                                 calendarData[selectedKey] || [];
+
+                            const selectedBbt = selectedEvents.find(
+                                event => event.type === 'bbt'
+                            );
+
+                            const selectedSymptoms = selectedEvents.filter(
+                                event => event.type === 'symptom'
+                            );
+
+                            const selectedMainEvents = selectedEvents.filter(
+                                event => event.type !== 'bbt' && event.type !== 'symptom'
+                            );
 
                             return (
 
@@ -322,9 +326,9 @@ export default function Calendar({
                                             Events
                                         </div>
 
-                                        {selectedEvents.length > 0 ? (
+                                        {selectedMainEvents.length > 0 ? (
 
-                                            selectedEvents.map((event, index) => {
+                                            selectedMainEvents.map((event, index) => {
 
                                                 let bgColor = getBgColor(event.color);
 
@@ -501,17 +505,188 @@ export default function Calendar({
 
                                     </div>
 
-                                    {activeAction && activeEvent && (
+                                    <div className="border-t pt-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-medium">
+                                                Symptoms
+                                            </div>
+
+                                            {selectedSymptoms.length === 0 && (
+                                                <button
+                                                    className="rounded border px-2 py-1 text-xs"
+                                                    onClick={() => {
+                                                        setActiveAction('add_symptom');
+                                                        setActiveEvent(null);
+                                                        setSymptomType('');
+                                                        setCustomSymptomType('');
+                                                        setSymptomLevel('1');
+                                                        setSymptomNotes('');
+                                                    }}
+                                                >
+                                                    Add Symptom
+                                                </button>
+                                            )}
+                                        </div>
+
+                                    </div>
+
+                                    {selectedSymptoms.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {selectedSymptoms.map((symptom, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className={`
+                                                            rounded-lg
+                                                            px-3
+                                                            py-2
+                                                            text-sm
+                                                            ${getBgColor(symptom.color)}
+                                                        `}
+                                                    >
+                                                        <div className="font-medium">
+                                                            {symptom.symptom_type} {'★'.repeat(symptom.level ?? 0)}
+                                                        </div>
+
+                                                        <div className="text-xs opacity-80">
+                                                            symptom
+                                                        </div>
+
+                                                        {symptom.notes && (
+                                                            <div className="mt-2 rounded bg-white/30 px-2 py-1 text-xs">
+                                                                {symptom.notes}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-2 flex gap-2">
+                                                            <button
+                                                                className="
+                                                                    rounded
+                                                                    border
+                                                                    px-2
+                                                                    py-1
+                                                                    text-xs
+                                                                    bg-white/20
+                                                                "
+                                                                onClick={() => {
+                                                                    setActiveAction('edit_symptom');
+                                                                    setActiveEvent(symptom);
+
+                                                                    setSymptomType(
+                                                                        SYMPTOM_OPTIONS.includes(symptom.symptom_type ?? '')
+                                                                            ? symptom.symptom_type ?? ''
+                                                                            : 'Other'
+                                                                    );
+
+                                                                    setCustomSymptomType(
+                                                                        SYMPTOM_OPTIONS.includes(symptom.symptom_type ?? '')
+                                                                            ? ''
+                                                                            : symptom.symptom_type ?? ''
+                                                                    );
+
+                                                                    setSymptomLevel(String(symptom.level ?? 1));
+                                                                    setSymptomNotes(symptom.notes ?? '');
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </button>
+
+                                                            {symptom.symptom_id && (
+                                                                <button
+                                                                    className="
+                                                                        rounded
+                                                                        border
+                                                                        px-2
+                                                                        py-1
+                                                                        text-xs
+                                                                        bg-white/20
+                                                                    "
+                                                                    onClick={() => {
+                                                                        if (!confirm('Delete this symptom?')) return;
+
+                                                                        router.delete(`/symptoms/${symptom.symptom_id}`, {
+                                                                            preserveScroll: true,
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-muted-foreground">
+                                                No symptoms logged
+                                            </div>
+                                        )}
+
+                                    <div className="border-t pt-4 space-y-2">
+                                        <div className="text-sm font-medium">
+                                            BBT
+                                        </div>
+
+                                        {selectedBbt ? (
+                                            <div className="text-sm">
+                                                <div>
+                                                    Temperature: {Number(selectedBbt.temperature).toFixed(2)}°C
+                                                </div>
+
+                                                <div className="mt-2 flex gap-2">
+                                                    <button
+                                                        className="rounded border px-2 py-1 text-xs"
+                                                        onClick={() => {
+                                                            setActiveAction('edit_bbt');
+                                                            setActiveEvent(selectedBbt);
+                                                            setTemperature(String(selectedBbt.temperature ?? ''));
+                                                        }}
+                                                    >
+                                                        Edit BBT
+                                                    </button>
+
+                                                    {selectedBbt.bbt_id && (
+                                                        <button
+                                                            className="rounded border px-2 py-1 text-xs"
+                                                            onClick={() => {
+                                                                if (!confirm('Delete this BBT reading?')) return;
+
+                                                                router.delete(`/bbt/${selectedBbt.bbt_id}`, {
+                                                                    preserveScroll: true,
+                                                                });
+                                                            }}
+                                                        >
+                                                            Delete BBT
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="rounded border px-2 py-1 text-xs"
+                                                onClick={() => {
+                                                    setActiveAction('add_bbt');
+                                                    setActiveEvent(null);
+                                                    setTemperature('');
+                                                }}
+                                            >
+                                                Add BBT
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {activeAction && (
                                         <form
                                             className="border-t pt-4 space-y-2"
                                             onSubmit={(e) => {
                                                 e.preventDefault();
 
                                                 if (activeAction === 'move_day_one') {
-                                                    if (!activeEvent.cycle_id) return;
+                                                    const cycleId = activeEvent?.cycle_id;
+
+                                                    if (!cycleId) return;
 
                                                     router.put(
-                                                        `/cycles/${activeEvent.cycle_id}`,
+                                                        `/cycles/${cycleId}`,
                                                         {
                                                             start_date: actionDate,
                                                         },
@@ -529,10 +704,12 @@ export default function Calendar({
                                                 }
 
                                                 if (activeAction === 'update_period_end') {
-                                                    if (!activeEvent.cycle_id) return;
+                                                    const cycleId = activeEvent?.cycle_id;
+
+                                                    if (!cycleId) return;
 
                                                     router.put(
-                                                        `/cycles/${activeEvent.cycle_id}`,
+                                                        `/cycles/${cycleId}`,
                                                         {
                                                             period_end_date: actionDate,
                                                         },
@@ -542,6 +719,47 @@ export default function Calendar({
                                                                 setActiveAction(null);
                                                                 setActiveEvent(null);
                                                                 setActionDate('');
+                                                            },
+                                                        }
+                                                    );
+
+                                                    return;
+                                                }
+
+                                                if (activeAction === 'add_bbt') {
+                                                    router.post(
+                                                        '/bbt',
+                                                        {
+                                                            date: selectedKey,
+                                                            temperature,
+                                                        },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                setActiveAction(null);
+                                                                setActiveEvent(null);
+                                                                setTemperature('');
+                                                            },
+                                                        }
+                                                    );
+
+                                                    return;
+                                                }
+
+                                                if (activeAction === 'edit_bbt') {
+                                                    if (!activeEvent?.bbt_id) return;
+
+                                                    router.put(
+                                                        `/bbt/${activeEvent.bbt_id}`,
+                                                        {
+                                                            temperature,
+                                                        },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                setActiveAction(null);
+                                                                setActiveEvent(null);
+                                                                setTemperature('');
                                                             },
                                                         }
                                                     );
@@ -567,20 +785,94 @@ export default function Calendar({
 
                                                     return;
                                                 }
+
+                                                if (activeAction === 'add_symptom') {
+                                                    const finalType =
+                                                        symptomType === 'Other'
+                                                            ? customSymptomType
+                                                            : symptomType;
+
+                                                    router.post(
+                                                        '/symptoms',
+                                                        {
+                                                            date: selectedKey,
+                                                            type: finalType,
+                                                            level: symptomLevel,
+                                                            notes: symptomNotes,
+                                                        },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                setActiveAction(null);
+                                                                setActiveEvent(null);
+                                                                setSymptomType('');
+                                                                setCustomSymptomType('');
+                                                                setSymptomLevel('1');
+                                                                setSymptomNotes('');
+                                                            },
+                                                        }
+                                                    );
+
+                                                    return;
+                                                }
+
+                                                if (activeAction === 'edit_symptom') {
+                                                    if (!activeEvent?.symptom_id) return;
+
+                                                    const finalType =
+                                                        symptomType === 'Other'
+                                                            ? customSymptomType
+                                                            : symptomType;
+
+                                                    router.put(
+                                                        `/symptoms/${activeEvent.symptom_id}`,
+                                                        {
+                                                            type: finalType,
+                                                            level: symptomLevel,
+                                                            notes: symptomNotes,
+                                                        },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                setActiveAction(null);
+                                                                setActiveEvent(null);
+                                                                setSymptomType('');
+                                                                setCustomSymptomType('');
+                                                                setSymptomLevel('1');
+                                                                setSymptomNotes('');
+                                                            },
+                                                        }
+                                                    );
+
+                                                    return;
+                                                }
+
+
                                             }}
                                         >
                                             <div className="text-sm font-medium">
                                                 {activeAction === 'move_day_one' && 'Move Day One'}
                                                 {activeAction === 'update_period_end' && 'Update Period End'}
                                                 {activeAction === 'add_actual_period' && 'Add Actual Period'}
+                                                {activeAction === 'add_bbt' && 'Add BBT'}
+                                                {activeAction === 'edit_bbt' && 'Edit BBT'}
+                                                {activeAction === 'add_symptom' && 'Add Symptom'}
+                                                {activeAction === 'edit_symptom' && 'Edit Symptom'}
                                             </div>
 
-                                            <input
-                                                type="date"
-                                                value={actionDate}
-                                                onChange={(e) => setActionDate(e.target.value)}
-                                                className="w-full rounded border px-2 py-1 text-sm"
-                                            />
+                                            {![
+                                                'add_bbt',
+                                                'edit_bbt',
+                                                'add_symptom',
+                                                'edit_symptom',
+                                            ].includes(activeAction) && (
+                                                <input
+                                                    type="date"
+                                                    value={actionDate}
+                                                    onChange={(e) => setActionDate(e.target.value)}
+                                                    className="w-full rounded border px-2 py-1 text-sm"
+                                                />
+                                            )}
 
                                             {errors?.start_date && (
                                                 <div className="text-sm text-red-500">
@@ -591,6 +883,92 @@ export default function Calendar({
                                             {errors?.period_end_date && (
                                                 <div className="text-sm text-red-500">
                                                     {errors.period_end_date}
+                                                </div>
+                                            )}
+
+                                            {['add_bbt', 'edit_bbt'].includes(activeAction) && (
+                                                <>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={temperature}
+                                                        onChange={(e) => setTemperature(e.target.value)}
+                                                        placeholder="Temperature °C"
+                                                        className="w-full rounded border px-2 py-1 text-sm"
+                                                    />
+
+                                                    {errors?.temperature && (
+                                                        <div className="text-sm text-red-500">
+                                                            {errors.temperature}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {['add_symptom', 'edit_symptom'].includes(activeAction) && (
+                                                <div className="space-y-2">
+                                                    <select
+                                                        value={symptomType}
+                                                        onChange={(e) => setSymptomType(e.target.value)}
+                                                        className="w-full rounded border px-2 py-1 text-sm"
+                                                    >
+                                                        <option value="">
+                                                            Select symptom
+                                                        </option>
+
+                                                        {SYMPTOM_OPTIONS.map((option) => (
+                                                            <option key={option} value={option}>
+                                                                {option}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+
+                                                    {symptomType === 'Other' && (
+                                                        <input
+                                                            type="text"
+                                                            value={customSymptomType}
+                                                            onChange={(e) => setCustomSymptomType(e.target.value)}
+                                                            placeholder="Custom symptom"
+                                                            className="w-full rounded border px-2 py-1 text-sm"
+                                                        />
+                                                    )}
+
+                                                    <select
+                                                        value={symptomLevel}
+                                                        onChange={(e) => setSymptomLevel(e.target.value)}
+                                                        className="w-full rounded border px-2 py-1 text-sm"
+                                                    >
+                                                        {[1, 2, 3, 4, 5].map((level) => (
+                                                            <option key={level} value={level}>
+                                                                {'★'.repeat(level)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+
+                                                    <textarea
+                                                        value={symptomNotes}
+                                                        onChange={(e) => setSymptomNotes(e.target.value)}
+                                                        placeholder="Notes"
+                                                        className="w-full rounded border px-2 py-1 text-sm"
+                                                    />
+
+                                                    {errors?.type && (
+                                                        <div className="text-sm text-red-500">
+                                                            {errors.type}
+                                                        </div>
+                                                    )}
+
+                                                    {errors?.level && (
+                                                        <div className="text-sm text-red-500">
+                                                            {errors.level}
+                                                        </div>
+                                                    )}
+
+                                                    {errors?.notes && (
+                                                        <div className="text-sm text-red-500">
+                                                            {errors.notes}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
 

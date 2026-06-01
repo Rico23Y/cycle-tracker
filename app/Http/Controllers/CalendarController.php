@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\Request;
-use App\Services\CyclePredictionService;
 use App\Services\CycleHistoryService;
+use App\Services\CyclePredictionService;
 
 class CalendarController extends Controller
 {
@@ -15,8 +15,8 @@ class CalendarController extends Controller
      * This is what loads when you visit /calendar
      */
     public function index(
-        CyclePredictionService $predictionService,
-        CycleHistoryService $historyService
+        CycleHistoryService $historyService,
+        CyclePredictionService $predictionService
     )
     {
         $user = auth()->user();
@@ -29,21 +29,6 @@ class CalendarController extends Controller
 
         $symptoms = $user->symptoms()->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard-style prediction
-        |--------------------------------------------------------------------------
-        */
-
-        $nextPeriod = $predictionService
-            ->predictNextPeriod($cycles);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Full calendar computed history
-        |--------------------------------------------------------------------------
-        */
-
         $calendarData = $historyService
             ->buildCalendarData(
                 $cycles,
@@ -51,18 +36,17 @@ class CalendarController extends Controller
                 $symptoms
             );
 
-        // dd($calendarData);
+        $prediction = $predictionService
+            ->predictNextPeriod($cycles);
 
         return Inertia::render('calendar/index', [
             'cycles' => $cycles,
             'bbtReadings' => $bbtReadings,
             'symptoms' => $symptoms,
-
-            // Small summary prediction
-            'nextPeriod' => $nextPeriod,
-
-            // Full computed calendar
             'calendarData' => $calendarData,
+
+            // Used only for initial calendar month
+            'defaultMonth' => $prediction['predicted_period_date'] ?? now()->toDateString(),
         ]);
     }
 

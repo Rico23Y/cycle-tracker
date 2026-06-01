@@ -3,11 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BbtReading;
-use App\Models\Cycle;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use App\Http\Requests\StoreBbtReadingRequest;
-use App\Http\Requests\UpdateBbtReadingRequest;
 use Inertia\Inertia;
 
 class BbtReadingController extends Controller
@@ -21,94 +17,72 @@ class BbtReadingController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * Store a newly created BBT reading.
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'temperature' => 'required|numeric',
-            'date' => 'required|date',
+        $validated = $request->validate([
+            'date' => [
+                'required',
+                'date',
+            ],
+            'temperature' => [
+                'required',
+                'numeric',
+                'between:30,45',
+            ],
         ]);
 
-        $user = auth()->user();
-        $date = Carbon::parse($request->date);
-
-        // ✅ STEP 1: Find correct cycle FIRST
-        $cycle = $user->cycles()
-            ->where('start_date', '<=', $date)
-            ->where(function ($query) use ($date) {
-                $query->where('end_date', '>=', $date)
-                    ->orWhereNull('end_date');
-            })
-            ->latest()
-            ->first();
-
-        // ❗ Safety check
-        if (!$cycle) {
-            return back()->withErrors([
-                'date' => 'No cycle found for this date.',
-            ]);
-        }
-
-        // ✅ STEP 2: Check duplicate AFTER cycle exists
-        $exists = $cycle->bbtReadings()
-            ->whereDate('date', $date) // 🔥 important fix
+        $exists = auth()->user()
+            ->bbtReadings()
+            ->whereDate('date', $validated['date'])
             ->exists();
 
         if ($exists) {
             return back()->withErrors([
-                'date' => 'Temperature already logged for this date.',
+                'temperature' => 'Temperature already logged for this date.',
             ]);
         }
 
-        // ✅ STEP 3: Save
-        $cycle->bbtReadings()->create([
-            'user_id' => $user->id,
-            'date' => $date,
-            'temperature' => $request->temperature,
-            'unit' => 'C',
+        auth()->user()->bbtReadings()->create([
+            'date' => $validated['date'],
+            'temperature' => $validated['temperature'],
         ]);
 
         return back();
     }
 
     /**
-     * Display the specified resource.
+     * Update an existing BBT reading.
      */
-    public function show(BbtReading $bbtReading)
+    public function update(Request $request, BbtReading $bbt)
     {
-        //
+        abort_unless($bbt->user_id === auth()->id(), 403);
+
+        $validated = $request->validate([
+            'temperature' => [
+                'required',
+                'numeric',
+                'between:30,45',
+            ],
+        ]);
+
+        $bbt->update([
+            'temperature' => $validated['temperature'],
+        ]);
+
+        return back();
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Remove an existing BBT reading.
      */
-    public function edit(BbtReading $bbtReading)
+    public function destroy(BbtReading $bbt)
     {
-        //
-    }
+        abort_unless($bbt->user_id === auth()->id(), 403);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateBbtReadingRequest $request, BbtReading $bbtReading)
-    {
-        //
-    }
+        $bbt->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(BbtReading $bbtReading)
-    {
-        //
+        return back();
     }
 }
