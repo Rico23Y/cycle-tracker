@@ -1,34 +1,393 @@
+import { useMemo, useState } from 'react';
 import { Head } from '@inertiajs/react';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    Tooltip,
+    ResponsiveContainer,
+    ReferenceLine,
+} from 'recharts';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Cycle',
+        title: 'Cycles',
         href: '/cycles',
     },
 ];
 
-export default function Cycle() {
+type Phase = {
+    name: string;
+    start_day: number;
+    end_day: number;
+    color: string;
+};
+
+type HormoneEstimate = {
+    day: number;
+    estrogen: number;
+    lh: number;
+    fsh: number;
+    progesterone: number;
+};
+
+type TimelineSymptom = {
+    id: number;
+    date: string;
+    cycle_day: number;
+    type: string;
+    level: number;
+    notes: string | null;
+};
+
+type Timeline = {
+    id: string;
+    cycle_id: number;
+
+    label: string;
+    is_predicted: boolean;
+
+    cycle_start_date: string;
+    cycle_end_date: string;
+    next_period_date: string;
+
+    cycle_length: number;
+    current_cycle_day: number | null;
+
+    ovulation_date: string;
+    ovulation_day: number;
+
+    pregnancy_test_date: string;
+
+    phases: Phase[];
+
+    hormone_estimates: HormoneEstimate[];
+
+    symptoms: TimelineSymptom[];
+};
+
+type Props = {
+    timelines: Timeline[];
+};
+
+const PHASE_COLOR_MAP: Record<string, string> = {
+    red: 'bg-red-200 border-red-300',
+    green: 'bg-green-100 border-green-300',
+    blue: 'bg-blue-100 border-blue-300',
+    yellow: 'bg-yellow-100 border-yellow-300',
+};
+
+export default function Cycle({
+    timelines,
+}: Props) {
+    const [selectedTimelineId, setSelectedTimelineId] = useState(
+        timelines.length > 0 ? timelines[timelines.length - 1].id : ''
+    );
+
+    const timeline = useMemo(() => {
+        return timelines.find(
+            item => item.id === selectedTimelineId
+        ) ?? null;
+    }, [timelines, selectedTimelineId]);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Cycle" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
+            <Head title="Cycles" />
+
+            <div className="space-y-4 p-4">
+
+                <div>
+                    <h1 className="text-xl font-semibold">
+                        {timeline?.current_cycle_day
+                            ? 'Current Cycle'
+                            : 'Cycle History'}
+                    </h1>
+
+                    <p className="text-sm text-muted-foreground">
+                        Estimated cycle phases and hormone-style trends.
+                    </p>
                 </div>
-                <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-                    <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                </div>
+
+                {timelines.length === 0 || !timeline ? (
+                    <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                        Not enough cycle data yet. Add at least two cycle start dates.
+                    </div>
+                ) : (
+                    <>
+
+                        {timelines.length > 0 && (
+                            <div className="rounded-xl border p-4">
+                                <div className="mb-2 text-sm font-medium">
+                                    Select Cycle Range
+                                </div>
+
+                                <select
+                                    value={selectedTimelineId}
+                                    onChange={(e) => setSelectedTimelineId(e.target.value)}
+                                    className="w-full rounded border px-3 py-2 text-sm"
+                                >
+                                    {timelines.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* SUMMARY CARDS */}
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="rounded-xl border p-4">
+                                <div className="text-sm text-muted-foreground">
+                                    {timeline.current_cycle_day
+                                        ? 'Current Cycle Day'
+                                        : 'Cycle Length'}
+                                </div>
+
+                                <div className="mt-2 text-4xl font-bold">
+                                    {timeline.current_cycle_day ?? timeline.cycle_length}
+                                </div>
+
+                                <div className="text-sm text-muted-foreground">
+                                    {timeline.current_cycle_day
+                                        ? `of ${timeline.cycle_length} days`
+                                        : 'days total'}
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border p-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Ovulation
+                                </div>
+
+                                <div className="mt-2 text-xl font-semibold">
+                                    Day {timeline.ovulation_day}
+                                </div>
+
+                                <div className="text-sm text-muted-foreground">
+                                    {new Date(timeline.ovulation_date + 'T00:00:00')
+                                        .toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border p-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Pregnancy Test
+                                </div>
+
+                                <div className="mt-2 text-xl font-semibold">
+                                    {new Date(timeline.pregnancy_test_date + 'T00:00:00')
+                                        .toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                </div>
+
+                                <div className="text-sm text-muted-foreground">
+                                    If period is missed
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PHASE BAR */}
+                        <div className="rounded-xl border p-4 space-y-4">
+                            <h2 className="font-semibold">
+                                Cycle Phases
+                            </h2>
+
+                            <div className="flex overflow-hidden rounded-lg border">
+                                {timeline.phases.map((phase) => {
+                                    const days =
+                                        phase.end_day - phase.start_day + 1;
+
+                                    const width =
+                                        (days / timeline.cycle_length) * 100;
+
+                                    return (
+                                        <div
+                                            key={phase.name}
+                                            className={`
+                                                border-r
+                                                p-3
+                                                text-center
+                                                text-xs
+                                                ${PHASE_COLOR_MAP[phase.color] ?? 'bg-gray-100'}
+                                            `}
+                                            style={{
+                                                width: `${width}%`,
+                                            }}
+                                            title={`Day ${phase.start_day} to ${phase.end_day}`}
+                                        >
+                                            <div className="font-medium">
+                                                {phase.name}
+                                            </div>
+
+                                            <div>
+                                                Day {phase.start_day}
+                                                {phase.start_day !== phase.end_day &&
+                                                    `-${phase.end_day}`}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="text-sm text-muted-foreground">
+                                Cycle starts on{' '}
+                                {new Date(timeline.cycle_start_date + 'T00:00:00')
+                                    .toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                    })}
+                                {' '}and is estimated to end before{' '}
+                                {new Date(timeline.next_period_date + 'T00:00:00')
+                                    .toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                    })}
+                                .
+                            </div>
+                        </div>
+
+                        {/* HORMONE STYLE GRAPH */}
+                        <div className="rounded-xl border p-4 space-y-4">
+                            <div>
+                                <h2 className="font-semibold">
+                                    Estimated Hormone Pattern
+                                </h2>
+
+                                <p className="text-sm text-muted-foreground">
+                                    Relative visual estimates only. These are not measured hormone levels.
+                                </p>
+                            </div>
+
+                            <div className="h-[320px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={timeline.hormone_estimates}>
+                                        <XAxis
+                                            dataKey="day"
+                                            tickFormatter={(day) => `D${day}`}
+                                        />
+
+                                        <YAxis
+                                            domain={[0, 100]}
+                                            tickFormatter={(value) => `${value}`}
+                                        />
+
+                                        <Tooltip
+                                            labelFormatter={(day) => `Cycle Day ${day}`}
+                                        />
+
+                                        {timeline.current_cycle_day && (
+                                            <ReferenceLine
+                                                x={timeline.current_cycle_day}
+                                                label="Today"
+                                            />
+                                        )}
+
+                                        <ReferenceLine
+                                            x={timeline.ovulation_day}
+                                            label="Ovulation"
+                                        />
+
+                                        <Area
+                                            type="monotone"
+                                            dataKey="estrogen"
+                                            name="Estrogen"
+                                            stroke="#ec4899"
+                                            fill="#ec4899"
+                                            fillOpacity={0.18}
+                                            dot={false}
+                                        />
+
+                                        <Area
+                                            type="monotone"
+                                            dataKey="lh"
+                                            name="LH"
+                                            stroke="#f97316"
+                                            fill="#f97316"
+                                            fillOpacity={0.18}
+                                            dot={false}
+                                        />
+
+                                        <Area
+                                            type="monotone"
+                                            dataKey="fsh"
+                                            name="FSH"
+                                            stroke="#3b82f6"
+                                            fill="#3b82f6"
+                                            fillOpacity={0.18}
+                                            dot={false}
+                                        />
+
+                                        <Area
+                                            type="monotone"
+                                            dataKey="progesterone"
+                                            name="Progesterone"
+                                            stroke="#22c55e"
+                                            fill="#22c55e"
+                                            fillOpacity={0.18}
+                                            dot={false}
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* SYMPTOMS */}
+                        <div className="rounded-xl border p-4 space-y-4">
+                            <h2 className="font-semibold">
+                                Symptoms
+                            </h2>
+
+                            {timeline.symptoms.length > 0 ? (
+                                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                                    {timeline.symptoms.map((symptom) => (
+                                        <div
+                                            key={symptom.id}
+                                            className="rounded-lg border p-3 text-sm"
+                                        >
+                                            <div className="font-medium">
+                                                {symptom.type}{' '}
+                                                {'★'.repeat(symptom.level)}
+                                            </div>
+
+                                            <div className="text-xs text-muted-foreground">
+                                                {new Date(symptom.date + 'T00:00:00')
+                                                    .toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                    })}
+                                            </div>
+
+                                            {symptom.notes && (
+                                                <div className="mt-2 text-xs">
+                                                    {symptom.notes}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No symptoms logged yet.
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
             </div>
         </AppLayout>
     );

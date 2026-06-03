@@ -5,14 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\Cycle;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Services\CycleTimelineService;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
 class CycleController extends Controller
 {
-    public function index()
+    public function index(CycleTimelineService $timelineService)
     {
-        return Inertia::render('cycles/index');
+        $user = auth()->user();
+
+        $cycles = $user->cycles()
+            ->orderBy('start_date')
+            ->get();
+
+        $symptoms = $user->symptoms()
+            ->orderBy('date')
+            ->get();
+
+        $timelines = $timelineService
+            ->buildTimelines(
+                $cycles,
+                $symptoms
+            );
+
+        return Inertia::render('cycles/index', [
+            'timelines' => $timelines,
+        ]);
     }
 
     public function create()
