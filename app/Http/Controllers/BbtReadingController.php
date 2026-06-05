@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BbtReading;
+use App\Services\BbtTimelineService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -11,9 +12,27 @@ class BbtReadingController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(BbtTimelineService $timelineService)
     {
-        return Inertia::render('bbt/index');
+        $user = auth()->user();
+
+        $cycles = $user->cycles()
+            ->orderBy('start_date')
+            ->get();
+
+        $bbtReadings = $user->bbtReadings()
+            ->orderBy('date')
+            ->get();
+
+        $timelines = $timelineService
+            ->buildTimelines(
+                $cycles,
+                $bbtReadings
+            );
+
+        return Inertia::render('bbt/index', [
+            'timelines' => $timelines,
+        ]);
     }
 
     /**
