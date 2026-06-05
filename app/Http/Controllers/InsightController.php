@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Insight;
 use App\Http\Requests\StoreInsightRequest;
 use App\Http\Requests\UpdateInsightRequest;
+use App\Services\InsightService;
 use Inertia\Inertia;
 
 class InsightController extends Controller
@@ -12,9 +13,20 @@ class InsightController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(InsightService $insightService)
     {
-        return Inertia::render('insights/index');
+        $user = auth()->user();
+
+        $cycles = $user->cycles()
+            ->orderBy('start_date')
+            ->get();
+
+        $insights = $insightService
+            ->buildInsights($cycles);
+
+        return Inertia::render('insights/index', [
+            'insights' => $insights,
+        ]);
     }
 
     /**
