@@ -13,7 +13,25 @@ return new class extends Migration
     {
         Schema::create('partners', function (Blueprint $table) {
             $table->id();
+
+            $table->foreignId('user_id')
+                ->constrained()
+                ->onDelete('cascade');
+
+            $table->string('name');
+            $table->string('email')->nullable();
+
+            $table->string('status')->default('active');
+
+            $table->boolean('can_view_cycles')->default(true);
+            $table->boolean('can_view_bbt')->default(false);
+            $table->boolean('can_view_symptoms')->default(false);
+            $table->boolean('can_view_predictions')->default(true);
+            $table->boolean('can_view_insights')->default(false);
+
             $table->timestamps();
+
+            $table->unique(['user_id', 'email']);
         });
     }
 
