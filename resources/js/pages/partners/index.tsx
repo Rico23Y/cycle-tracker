@@ -10,31 +10,59 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-type Partner = {
+type UserSummary = {
     id: number;
     name: string;
+    email: string;
+};
+
+type PartnerStatus = 'active' | 'pending' | 'paused' | 'declined';
+
+type Partner = {
+    id: number;
+
+    owner_user_id: number;
+    partner_user_id: number | null;
+
+    name: string;
     email: string | null;
-    status: 'active' | 'paused';
+    status: PartnerStatus;
+
+    partner_user?: UserSummary | null;
+    owner?: UserSummary | null;
 
     can_view_cycles: boolean;
+    can_edit_cycles: boolean;
+
     can_view_bbt: boolean;
+    can_edit_bbt: boolean;
+
     can_view_symptoms: boolean;
+    can_edit_symptoms: boolean;
+
     can_view_predictions: boolean;
     can_view_insights: boolean;
 };
 
 type Props = {
     partners: Partner[];
+    sharedWithMe: Partner[];
 };
 
 type PartnerForm = {
     name: string;
     email: string;
-    status: 'active' | 'paused';
+    status: PartnerStatus;
 
     can_view_cycles: boolean;
+    can_edit_cycles: boolean;
+
     can_view_bbt: boolean;
+    can_edit_bbt: boolean;
+
     can_view_symptoms: boolean;
+    can_edit_symptoms: boolean;
+
     can_view_predictions: boolean;
     can_view_insights: boolean;
 };
@@ -45,28 +73,40 @@ const defaultForm: PartnerForm = {
     status: 'active',
 
     can_view_cycles: true,
+    can_edit_cycles: false,
+
     can_view_bbt: false,
+    can_edit_bbt: false,
+
     can_view_symptoms: false,
+    can_edit_symptoms: false,
+
     can_view_predictions: true,
     can_view_insights: false,
 };
 
-const permissionLabels = [
+const permissionGroups = [
     {
-        key: 'can_view_cycles',
         label: 'Cycles',
         description: 'Period dates and cycle history',
+        viewKey: 'can_view_cycles',
+        editKey: 'can_edit_cycles',
     },
     {
-        key: 'can_view_bbt',
         label: 'BBT',
         description: 'Basal body temperature records',
+        viewKey: 'can_view_bbt',
+        editKey: 'can_edit_bbt',
     },
     {
-        key: 'can_view_symptoms',
         label: 'Symptoms',
         description: 'Logged symptoms and notes',
+        viewKey: 'can_view_symptoms',
+        editKey: 'can_edit_symptoms',
     },
+] as const;
+
+const viewOnlyPermissions = [
     {
         key: 'can_view_predictions',
         label: 'Predictions',
@@ -79,8 +119,23 @@ const permissionLabels = [
     },
 ] as const;
 
+type EditableViewKey =
+    | 'can_view_cycles'
+    | 'can_view_bbt'
+    | 'can_view_symptoms';
+
+type EditableEditKey =
+    | 'can_edit_cycles'
+    | 'can_edit_bbt'
+    | 'can_edit_symptoms';
+
+type ViewOnlyKey =
+    | 'can_view_predictions'
+    | 'can_view_insights';
+
 export default function Partners({
     partners,
+    sharedWithMe,
 }: Props) {
     const [mode, setMode] = useState<'add' | 'edit' | null>(null);
 
@@ -114,8 +169,14 @@ export default function Partners({
             status: partner.status,
 
             can_view_cycles: partner.can_view_cycles,
+            can_edit_cycles: partner.can_edit_cycles,
+
             can_view_bbt: partner.can_view_bbt,
+            can_edit_bbt: partner.can_edit_bbt,
+
             can_view_symptoms: partner.can_view_symptoms,
+            can_edit_symptoms: partner.can_edit_symptoms,
+
             can_view_predictions: partner.can_view_predictions,
             can_view_insights: partner.can_view_insights,
         });
@@ -125,14 +186,10 @@ export default function Partners({
         e.preventDefault();
 
         if (mode === 'add') {
-            router.post(
-                '/partners',
-                form,
-                {
-                    preserveScroll: true,
-                    onSuccess: resetForm,
-                }
-            );
+            router.post('/partners', form, {
+                preserveScroll: true,
+                onSuccess: resetForm,
+            });
 
             return;
         }
@@ -140,26 +197,37 @@ export default function Partners({
         if (mode === 'edit') {
             if (!activePartner) return;
 
-            router.put(
-                `/partners/${activePartner.id}`,
-                form,
-                {
-                    preserveScroll: true,
-                    onSuccess: resetForm,
-                }
-            );
+            router.put(`/partners/${activePartner.id}`, form, {
+                preserveScroll: true,
+                onSuccess: resetForm,
+            });
         }
     }
 
-    function updatePermission(
-        key: keyof Pick<
-            PartnerForm,
-            | 'can_view_cycles'
-            | 'can_view_bbt'
-            | 'can_view_symptoms'
-            | 'can_view_predictions'
-            | 'can_view_insights'
-        >,
+    function updateViewPermission(
+        viewKey: EditableViewKey,
+        editKey: EditableEditKey,
+        value: boolean
+    ) {
+        setForm({
+            ...form,
+            [viewKey]: value,
+            [editKey]: value ? form[editKey] : false,
+        });
+    }
+
+    function updateEditPermission(
+        editKey: EditableEditKey,
+        value: boolean
+    ) {
+        setForm({
+            ...form,
+            [editKey]: value,
+        });
+    }
+
+    function updateViewOnlyPermission(
+        key: ViewOnlyKey,
         value: boolean
     ) {
         setForm({
@@ -173,7 +241,6 @@ export default function Partners({
             <Head title="Partners" />
 
             <div className="space-y-4 p-4">
-
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h1 className="text-xl font-semibold">
@@ -181,7 +248,7 @@ export default function Partners({
                         </h1>
 
                         <p className="text-sm text-muted-foreground">
-                            Manage partner access and choose what cycle data can be shared.
+                            Manage who can view or edit your cycle data.
                         </p>
                     </div>
 
@@ -205,7 +272,7 @@ export default function Partners({
                             </h2>
 
                             <p className="text-sm text-muted-foreground">
-                                Partner sharing is controlled by the permissions below.
+                                If view access is disabled, edit access is also disabled.
                             </p>
                         </div>
 
@@ -271,7 +338,7 @@ export default function Partners({
                                 onChange={(e) => {
                                     setForm({
                                         ...form,
-                                        status: e.target.value as 'active' | 'paused',
+                                        status: e.target.value as PartnerStatus,
                                     });
                                 }}
                                 className="mt-1 w-full rounded border px-3 py-2 text-sm"
@@ -280,8 +347,16 @@ export default function Partners({
                                     Active
                                 </option>
 
+                                <option value="pending">
+                                    Pending
+                                </option>
+
                                 <option value="paused">
                                     Paused
+                                </option>
+
+                                <option value="declined">
+                                    Declined
                                 </option>
                             </select>
 
@@ -295,16 +370,85 @@ export default function Partners({
                         <div className="space-y-3">
                             <div>
                                 <h3 className="text-sm font-medium">
-                                    Shared Data
+                                    View and Edit Access
                                 </h3>
 
                                 <p className="text-sm text-muted-foreground">
-                                    Choose what this partner is allowed to view.
+                                    Choose which data this partner can see and modify.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-3">
+                                {permissionGroups.map((permission) => (
+                                    <div
+                                        key={permission.viewKey}
+                                        className="rounded-lg border p-3 text-sm space-y-3"
+                                    >
+                                        <div>
+                                            <div className="font-medium">
+                                                {permission.label}
+                                            </div>
+
+                                            <div className="text-xs text-muted-foreground">
+                                                {permission.description}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-4">
+                                            <label className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form[permission.viewKey]}
+                                                    onChange={(e) => {
+                                                        updateViewPermission(
+                                                            permission.viewKey,
+                                                            permission.editKey,
+                                                            e.target.checked
+                                                        );
+                                                    }}
+                                                />
+
+                                                <span>
+                                                    Can view
+                                                </span>
+                                            </label>
+
+                                            <label className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form[permission.editKey]}
+                                                    disabled={!form[permission.viewKey]}
+                                                    onChange={(e) => {
+                                                        updateEditPermission(
+                                                            permission.editKey,
+                                                            e.target.checked
+                                                        );
+                                                    }}
+                                                />
+
+                                                <span className={!form[permission.viewKey] ? 'text-muted-foreground' : ''}>
+                                                    Can edit
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-sm font-medium">
+                                    View Only Data
+                                </h3>
+
+                                <p className="text-sm text-muted-foreground">
+                                    These sections can be viewed but not directly edited.
                                 </p>
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2">
-                                {permissionLabels.map((permission) => (
+                                {viewOnlyPermissions.map((permission) => (
                                     <label
                                         key={permission.key}
                                         className="flex gap-3 rounded-lg border p-3 text-sm"
@@ -313,7 +457,7 @@ export default function Partners({
                                             type="checkbox"
                                             checked={form[permission.key]}
                                             onChange={(e) => {
-                                                updatePermission(
+                                                updateViewOnlyPermission(
                                                     permission.key,
                                                     e.target.checked
                                                 );
@@ -356,7 +500,7 @@ export default function Partners({
 
                 <div className="rounded-xl border p-4 space-y-4">
                     <h2 className="font-semibold">
-                        Partner List
+                        People I Share With
                     </h2>
 
                     {partners.length > 0 ? (
@@ -377,12 +521,31 @@ export default function Partners({
                                             </div>
 
                                             <div className="mt-1 text-xs">
+                                                Account:{' '}
+                                                {partner.partner_user_id ? (
+                                                    <span className="text-green-600">
+                                                        Linked user
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-orange-600">
+                                                        Not registered / not linked
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-1 text-xs">
                                                 Status:{' '}
-                                                <span className={
-                                                    partner.status === 'active'
-                                                        ? 'text-green-600'
-                                                        : 'text-orange-600'
-                                                }>
+                                                <span
+                                                    className={
+                                                        partner.status === 'active'
+                                                            ? 'text-green-600'
+                                                            : partner.status === 'pending'
+                                                                ? 'text-blue-600'
+                                                                : partner.status === 'paused'
+                                                                    ? 'text-orange-600'
+                                                                    : 'text-red-600'
+                                                    }
+                                                >
                                                     {partner.status}
                                                 </span>
                                             </div>
@@ -414,7 +577,31 @@ export default function Partners({
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
-                                        {permissionLabels.map((permission) => {
+                                        {permissionGroups.map((permission) => {
+                                            const canView = partner[permission.viewKey];
+                                            const canEdit = partner[permission.editKey];
+
+                                            return (
+                                                <span
+                                                    key={permission.viewKey}
+                                                    className={`
+                                                        rounded-full
+                                                        border
+                                                        px-2
+                                                        py-1
+                                                        text-xs
+                                                        ${canView
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-500'}
+                                                    `}
+                                                >
+                                                    {permission.label}: {canView ? 'View' : 'Locked'}
+                                                    {canView && canEdit ? ' + Edit' : ''}
+                                                </span>
+                                            );
+                                        })}
+
+                                        {viewOnlyPermissions.map((permission) => {
                                             const allowed = partner[permission.key];
 
                                             return (
@@ -431,7 +618,7 @@ export default function Partners({
                                                             : 'bg-gray-100 text-gray-500'}
                                                     `}
                                                 >
-                                                    {allowed ? 'Can view' : 'Hidden'} {permission.label}
+                                                    {permission.label}: {allowed ? 'View' : 'Locked'}
                                                 </span>
                                             );
                                         })}
@@ -441,11 +628,93 @@ export default function Partners({
                         </div>
                     ) : (
                         <div className="text-sm text-muted-foreground">
-                            No partners added yet.
+                            You are not sharing your data with anyone yet.
                         </div>
                     )}
                 </div>
 
+                <div className="rounded-xl border p-4 space-y-4">
+                    <h2 className="font-semibold">
+                        People Sharing With Me
+                    </h2>
+
+                    {sharedWithMe.length > 0 ? (
+                        <div className="grid gap-3">
+                            {sharedWithMe.map((share) => (
+                                <div
+                                    key={share.id}
+                                    className="rounded-lg border p-4 space-y-3"
+                                >
+                                    <div>
+                                        <div className="font-medium">
+                                            {share.owner?.name ?? 'Unknown owner'}
+                                        </div>
+
+                                        <div className="text-sm text-muted-foreground">
+                                            {share.owner?.email ?? 'No email'}
+                                        </div>
+
+                                        <div className="mt-1 text-xs">
+                                            This user shared cycle data with you.
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {permissionGroups.map((permission) => {
+                                            const canView = share[permission.viewKey];
+                                            const canEdit = share[permission.editKey];
+
+                                            return (
+                                                <span
+                                                    key={permission.viewKey}
+                                                    className={`
+                                                        rounded-full
+                                                        border
+                                                        px-2
+                                                        py-1
+                                                        text-xs
+                                                        ${canView
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-500'}
+                                                    `}
+                                                >
+                                                    {permission.label}: {canView ? 'View' : 'Locked'}
+                                                    {canView && canEdit ? ' + Edit' : ''}
+                                                </span>
+                                            );
+                                        })}
+
+                                        {viewOnlyPermissions.map((permission) => {
+                                            const allowed = share[permission.key];
+
+                                            return (
+                                                <span
+                                                    key={permission.key}
+                                                    className={`
+                                                        rounded-full
+                                                        border
+                                                        px-2
+                                                        py-1
+                                                        text-xs
+                                                        ${allowed
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-500'}
+                                                    `}
+                                                >
+                                                    {permission.label}: {allowed ? 'View' : 'Locked'}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-sm text-muted-foreground">
+                            No one is sharing cycle data with you yet.
+                        </div>
+                    )}
+                </div>
             </div>
         </AppLayout>
     );
