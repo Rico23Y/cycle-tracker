@@ -69,6 +69,11 @@ class User extends Authenticatable
     
     public function partners()
     {
-        return $this->hasMany(Partner::class);
+        return $this->hasMany(Partner::class, 'owner_user_id');
+    }
+
+    public function sharedWithMe()
+    {
+        return $this->hasMany(Partner::class, 'partner_user_id');
     }
 }

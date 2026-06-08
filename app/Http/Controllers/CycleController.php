@@ -65,6 +65,8 @@ class CycleController extends Controller
 
         Cycle::create([
             'user_id' => auth()->id(),
+            'created_by_user_id' => auth()->id(),
+            'updated_by_user_id' => auth()->id(),
             'start_date' => $validated['start_date'],
             'period_length' => $validated['period_length'] ?? null,
         ]);
@@ -121,6 +123,7 @@ class CycleController extends Controller
         if (!empty($validated['start_date'])) {
             $cycle->update([
                 'start_date' => $validated['start_date'],
+                'updated_by_user_id' => auth()->id(),
             ]);
         }
 
@@ -134,6 +137,7 @@ class CycleController extends Controller
         if (!empty($validated['clear_period_length'])) {
             $cycle->update([
                 'period_length' => null,
+                'updated_by_user_id' => auth()->id(),
             ]);
 
             return back();
@@ -166,6 +170,7 @@ class CycleController extends Controller
 
             $cycle->update([
                 'period_length' => $periodLength,
+                'updated_by_user_id' => auth()->id(),
             ]);
         }
 

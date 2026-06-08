@@ -66,6 +66,8 @@ class BbtReadingController extends Controller
         auth()->user()->bbtReadings()->create([
             'date' => $validated['date'],
             'temperature' => $validated['temperature'],
+            'created_by_user_id' => auth()->id(),
+            'updated_by_user_id' => auth()->id(),
         ]);
 
         return back();
@@ -88,6 +90,7 @@ class BbtReadingController extends Controller
 
         $bbt->update([
             'temperature' => $validated['temperature'],
+            'updated_by_user_id' => auth()->id(),
         ]);
 
         return back();

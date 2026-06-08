@@ -10,7 +10,12 @@ class BbtReading extends Model
     /** @use HasFactory<\Database\Factories\BbtReadingFactory> */
     use HasFactory;
 
-    protected $fillable = ['user_id', 'date', 'temperature'];
+    protected $fillable = [
+        'user_id',
+        'created_by_user_id',
+        'updated_by_user_id',
+        'date',
+        'temperature'];
 
         protected $casts = [
         'temperature' => 'float',

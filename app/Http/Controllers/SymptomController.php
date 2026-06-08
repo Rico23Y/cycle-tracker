@@ -43,6 +43,8 @@ class SymptomController extends Controller
             'type' => $validated['type'],
             'level' => $validated['level'],
             'notes' => $validated['notes'] ?? null,
+            'created_by_user_id' => auth()->id(),
+            'updated_by_user_id' => auth()->id(),
         ]);
 
         return back();
@@ -75,6 +77,7 @@ class SymptomController extends Controller
             'type' => $validated['type'],
             'level' => $validated['level'],
             'notes' => $validated['notes'] ?? null,
+            'updated_by_user_id' => auth()->id(),
         ]);
 
         return back();

@@ -14,24 +14,61 @@ return new class extends Migration
         Schema::create('partners', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')
-                ->constrained()
+            /*
+            |--------------------------------------------------------------------------
+            | Owner and Partner
+            |--------------------------------------------------------------------------
+            | owner_user_id = owner of the cycle data
+            | partner_user_id = existing user allowed to view/edit
+            |--------------------------------------------------------------------------
+            */
+            $table->foreignId('owner_user_id')
+                ->constrained('users')
                 ->onDelete('cascade');
+
+            $table->foreignId('partner_user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
 
             $table->string('name');
             $table->string('email')->nullable();
 
+            /*
+            |--------------------------------------------------------------------------
+            | Status
+            |--------------------------------------------------------------------------
+            | pending = request sent but not accepted
+            | active = partner access enabled
+            | paused = temporarily disabled
+            | declined = request declined
+            |--------------------------------------------------------------------------
+            */
             $table->string('status')->default('active');
 
+            /*
+            |--------------------------------------------------------------------------
+            | Permissions
+            |--------------------------------------------------------------------------
+            */
+
             $table->boolean('can_view_cycles')->default(true);
+            $table->boolean('can_edit_cycles')->default(false);
+
             $table->boolean('can_view_bbt')->default(false);
+            $table->boolean('can_edit_bbt')->default(false);
+
             $table->boolean('can_view_symptoms')->default(false);
+            $table->boolean('can_edit_symptoms')->default(false);
+
             $table->boolean('can_view_predictions')->default(true);
+
             $table->boolean('can_view_insights')->default(false);
 
             $table->timestamps();
 
-            $table->unique(['user_id', 'email']);
+            $table->unique(['owner_user_id', 'email']);
+            $table->unique(['owner_user_id', 'partner_user_id']);
         });
     }
 

@@ -10,5 +10,12 @@ class Symptom extends Model
     /** @use HasFactory<\Database\Factories\SymptomFactory> */
     use HasFactory;
 
-    protected $fillable = ['user_id', 'date', 'type', 'level', 'notes'];
+    protected $fillable = [
+        'user_id', 
+        'created_by_user_id',
+        'updated_by_user_id',
+        'date',
+        'type',
+        'level', 
+        'notes'];
 }
