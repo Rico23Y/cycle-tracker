@@ -143,9 +143,12 @@ export default function Partners({
 
     const [form, setForm] = useState<PartnerForm>(defaultForm);
 
-    const { errors } = usePage().props as {
+    const { errors, dataAccess } = usePage().props as {
         errors?: Record<string, string>;
+        dataAccess?: unknown;
     };
+
+console.log(dataAccess);
 
     function resetForm() {
         setMode(null);
