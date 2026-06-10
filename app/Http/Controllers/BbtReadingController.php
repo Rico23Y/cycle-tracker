@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BbtReading;
 use App\Services\BbtTimelineService;
+use App\Services\DataAccessContextService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,15 +13,28 @@ class BbtReadingController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(BbtTimelineService $timelineService)
-    {
-        $user = auth()->user();
+    public function index(
+        Request $request,
+        BbtTimelineService $timelineService,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve($request->query('owner'));
 
-        $cycles = $user->cycles()
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        if (!$permissions['can_view_bbt']) {
+            return Inertia::render('bbt/index', [
+                'timelines' => [],
+                'bbtLocked' => true,
+            ]);
+        }
+
+        $cycles = $owner->cycles()
             ->orderBy('start_date')
             ->get();
 
-        $bbtReadings = $user->bbtReadings()
+        $bbtReadings = $owner->bbtReadings()
             ->orderBy('date')
             ->get();
 
@@ -32,14 +46,24 @@ class BbtReadingController extends Controller
 
         return Inertia::render('bbt/index', [
             'timelines' => $timelines,
+            'bbtLocked' => false,
         ]);
     }
 
     /**
      * Store a newly created BBT reading.
      */
-    public function store(Request $request)
-    {
+    public function store(
+        Request $request,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve($request->query('owner'));
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_bbt'], 403);
+
         $validated = $request->validate([
             'date' => [
                 'required',
@@ -52,7 +76,7 @@ class BbtReadingController extends Controller
             ],
         ]);
 
-        $exists = auth()->user()
+        $exists = $owner
             ->bbtReadings()
             ->whereDate('date', $validated['date'])
             ->exists();
@@ -63,11 +87,12 @@ class BbtReadingController extends Controller
             ]);
         }
 
-        auth()->user()->bbtReadings()->create([
-            'date' => $validated['date'],
-            'temperature' => $validated['temperature'],
+        BbtReading::create([
+            'user_id' => $owner->id,
             'created_by_user_id' => auth()->id(),
             'updated_by_user_id' => auth()->id(),
+            'date' => $validated['date'],
+            'temperature' => $validated['temperature'],
         ]);
 
         return back();
@@ -76,9 +101,18 @@ class BbtReadingController extends Controller
     /**
      * Update an existing BBT reading.
      */
-    public function update(Request $request, BbtReading $bbt)
-    {
-        abort_unless($bbt->user_id === auth()->id(), 403);
+    public function update(
+        Request $request,
+        BbtReading $bbt,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve($request->query('owner'));
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_bbt'], 403);
+        abort_unless($bbt->user_id === $owner->id, 403);
 
         $validated = $request->validate([
             'temperature' => [
@@ -99,9 +133,18 @@ class BbtReadingController extends Controller
     /**
      * Remove an existing BBT reading.
      */
-    public function destroy(BbtReading $bbt)
-    {
-        abort_unless($bbt->user_id === auth()->id(), 403);
+    public function destroy(
+        Request $request,
+        BbtReading $bbt,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve($request->query('owner'));
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_bbt'], 403);
+        abort_unless($bbt->user_id === $owner->id, 403);
 
         $bbt->delete();
 

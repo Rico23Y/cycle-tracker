@@ -41,15 +41,49 @@ type BbtTimeline = {
 
 type Props = {
     timelines: BbtTimeline[];
+    bbtLocked?: boolean;
 };
 
 export default function Bbt({
     timelines,
+    bbtLocked = false,
 }: Props) {
+    const { errors, dataAccess } = usePage().props as {
+        errors?: Record<string, string>;
+        dataAccess?: {
+            owner_key: string;
+            owner_label: string;
+            permissions: {
+                can_view_bbt: boolean;
+                can_edit_bbt: boolean;
+            };
+        };
+    };
+
+    const canViewBbt = dataAccess?.permissions.can_view_bbt ?? true;
+    const canEditBbt = dataAccess?.permissions.can_edit_bbt ?? true;
+
+    const ownerQuery =
+        dataAccess?.owner_key && dataAccess.owner_key !== 'me'
+            ? `?owner=${encodeURIComponent(dataAccess.owner_key)}`
+            : '';
 
     const todayKey = new Date().toISOString().slice(0, 10);
+
     const [quickDate, setQuickDate] = useState(todayKey);
     const [quickTemperature, setQuickTemperature] = useState('');
+
+    const [selectedTimelineId, setSelectedTimelineId] = useState(
+        timelines.length > 0 ? timelines[timelines.length - 1].id : ''
+    );
+
+    const [editingDate, setEditingDate] = useState<string | null>(null);
+    const [tableTemperature, setTableTemperature] = useState('');
+    const [temperatureDrafts, setTemperatureDrafts] = useState<Record<string, string>>({});
+
+    const timeline = useMemo(() => {
+        return timelines.find((item) => item.id === selectedTimelineId) ?? null;
+    }, [timelines, selectedTimelineId]);
 
     const existingReadingForQuickDate = timelines
         .flatMap((item) => item.readings)
@@ -57,23 +91,12 @@ export default function Bbt({
             return reading.date === quickDate && reading.id !== null;
         });
 
-    const [selectedTimelineId, setSelectedTimelineId] = useState(
-        timelines.length > 0 ? timelines[timelines.length - 1].id : ''
-    );
-
-    const timeline = useMemo(() => {
-        return timelines.find(
-            item => item.id === selectedTimelineId
-        ) ?? null;
-    }, [timelines, selectedTimelineId]);
-
-    const { errors } = usePage().props as {
-        errors?: Record<string, string>;
-    };
-
-    const [editingDate, setEditingDate] = useState<string | null>(null);
-    const [tableTemperature, setTableTemperature] = useState('');
-    const [temperatureDrafts, setTemperatureDrafts] = useState<Record<string, string>>({});
+    const chartData = timeline
+        ? timeline.readings.filter(
+            (reading): reading is BbtReading & { temperature: number } =>
+                reading.temperature !== null
+        )
+        : [];
 
     function resetInlineEdit() {
         setEditingDate(null);
@@ -84,6 +107,7 @@ export default function Bbt({
     function submitQuickAdd(e: React.FormEvent) {
         e.preventDefault();
 
+        if (!canEditBbt) return;
         if (!quickDate || !quickTemperature) return;
 
         if (existingReadingForQuickDate) {
@@ -94,7 +118,7 @@ export default function Bbt({
             if (!shouldUpdate) return;
 
             router.put(
-                `/bbt/${existingReadingForQuickDate.id}`,
+                `/bbt/${existingReadingForQuickDate.id}${ownerQuery}`,
                 {
                     temperature: quickTemperature,
                 },
@@ -110,7 +134,7 @@ export default function Bbt({
         }
 
         router.post(
-            '/bbt',
+            `/bbt${ownerQuery}`,
             {
                 date: quickDate,
                 temperature: quickTemperature,
@@ -125,6 +149,8 @@ export default function Bbt({
     }
 
     function saveReading(reading: BbtReading) {
+        if (!canEditBbt) return;
+
         const value = reading.id
             ? tableTemperature
             : temperatureDrafts[reading.date];
@@ -133,7 +159,7 @@ export default function Bbt({
 
         if (reading.id) {
             router.put(
-                `/bbt/${reading.id}`,
+                `/bbt/${reading.id}${ownerQuery}`,
                 {
                     temperature: value,
                 },
@@ -147,7 +173,7 @@ export default function Bbt({
         }
 
         router.post(
-            '/bbt',
+            `/bbt${ownerQuery}`,
             {
                 date: reading.date,
                 temperature: value,
@@ -159,28 +185,46 @@ export default function Bbt({
         );
     }
 
-    const chartData = timeline
-        ? timeline.readings.filter(
-            (reading): reading is BbtReading & { temperature: number } =>
-                reading.temperature !== null
-        )
-        : [];
+    if (bbtLocked || !canViewBbt) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="BBT" />
+
+                <div className="p-4">
+                    <div className="rounded-xl border p-6">
+                        <h1 className="text-xl font-semibold">
+                            BBT Locked
+                        </h1>
+
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            The owner has not allowed access to BBT records.
+                        </p>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="BBT" />
 
             <div className="space-y-4 p-4">
-
                 <div>
                     <h1 className="text-xl font-semibold">
                         Basal Body Temperature
                     </h1>
 
                     <p className="text-sm text-muted-foreground">
-                        Track BBT by cycle day, starting from Day One.
+                        Viewing {dataAccess?.owner_label ?? 'My Data'}.
                     </p>
                 </div>
+
+                {!canEditBbt && (
+                    <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                        You can view BBT records, but editing is locked by the owner.
+                    </div>
+                )}
 
                 {timelines.length === 0 || !timeline ? (
                     <div className="rounded-xl border p-4 text-sm text-muted-foreground">
@@ -188,7 +232,6 @@ export default function Bbt({
                     </div>
                 ) : (
                     <>
-                        {/* SELECT RANGE */}
                         <div className="rounded-xl border p-4">
                             <div className="mb-2 text-sm font-medium">
                                 Select Cycle Range
@@ -210,7 +253,6 @@ export default function Bbt({
                             </select>
                         </div>
 
-                        {/* CHART */}
                         <div className="rounded-xl border p-4 space-y-4">
                             <div>
                                 <h2 className="font-semibold">
@@ -284,67 +326,66 @@ export default function Bbt({
                             </div>
                         </div>
 
-                        {/* QUICK ADD */}
-                        <form
-                            onSubmit={submitQuickAdd}
-                            className="rounded-xl border p-4 space-y-3"
-                        >
-                            <div>
-                                <h2 className="font-semibold">
-                                    Quick Add BBT
-                                </h2>
+                        {canEditBbt && (
+                            <form
+                                onSubmit={submitQuickAdd}
+                                className="rounded-xl border p-4 space-y-3"
+                            >
+                                <div>
+                                    <h2 className="font-semibold">
+                                        Quick Add BBT
+                                    </h2>
 
-                                <p className="text-sm text-muted-foreground">
-                                    Add a temperature reading by date.
-                                </p>
-                            </div>
-
-                            <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-                                <input
-                                    type="date"
-                                    value={quickDate}
-                                    onChange={(e) => setQuickDate(e.target.value)}
-                                    className="rounded border px-3 py-2 text-sm"
-                                />
-
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={quickTemperature}
-                                    onChange={(e) => setQuickTemperature(e.target.value)}
-                                    placeholder="Temperature °C"
-                                    className="rounded border px-3 py-2 text-sm"
-                                />
-
-                                <button
-                                    type="submit"
-                                    className="rounded bg-blue-500 px-4 py-2 text-sm text-white"
-                                >
-                                    {existingReadingForQuickDate ? 'Update' : 'Add'}
-                                </button>
-                            </div>
-
-                            {existingReadingForQuickDate && (
-                                <div className="text-sm text-orange-600">
-                                    A BBT reading already exists for this date. Submitting will ask if you want to update it.
+                                    <p className="text-sm text-muted-foreground">
+                                        Add a temperature reading by date.
+                                    </p>
                                 </div>
-                            )}
 
-                            {errors?.date && (
-                                <div className="text-sm text-red-500">
-                                    {errors.date}
+                                <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+                                    <input
+                                        type="date"
+                                        value={quickDate}
+                                        onChange={(e) => setQuickDate(e.target.value)}
+                                        className="rounded border px-3 py-2 text-sm"
+                                    />
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={quickTemperature}
+                                        onChange={(e) => setQuickTemperature(e.target.value)}
+                                        placeholder="Temperature °C"
+                                        className="rounded border px-3 py-2 text-sm"
+                                    />
+
+                                    <button
+                                        type="submit"
+                                        className="rounded bg-blue-500 px-4 py-2 text-sm text-white"
+                                    >
+                                        {existingReadingForQuickDate ? 'Update' : 'Add'}
+                                    </button>
                                 </div>
-                            )}
 
-                            {errors?.temperature && (
-                                <div className="text-sm text-red-500">
-                                    {errors.temperature}
-                                </div>
-                            )}
-                        </form>
+                                {existingReadingForQuickDate && (
+                                    <div className="text-sm text-orange-600">
+                                        A BBT reading already exists for this date. Submitting will ask if you want to update it.
+                                    </div>
+                                )}
 
+                                {errors?.date && (
+                                    <div className="text-sm text-red-500">
+                                        {errors.date}
+                                    </div>
+                                )}
 
-                        {/* TABLE */}
+                                {errors?.temperature && (
+                                    <div className="text-sm text-red-500">
+                                        {errors.temperature}
+                                    </div>
+                                )}
+                            </form>
+                        )}
+
                         <div className="rounded-xl border p-4 space-y-4">
                             <h2 className="font-semibold">
                                 BBT Readings
@@ -364,9 +405,11 @@ export default function Bbt({
                                                 <th className="py-2">
                                                     Temperature
                                                 </th>
-                                                <th className="py-2">
-                                                    Actions
-                                                </th>
+                                                {canEditBbt && (
+                                                    <th className="py-2">
+                                                        Actions
+                                                    </th>
+                                                )}
                                             </tr>
                                         </thead>
 
@@ -393,7 +436,7 @@ export default function Bbt({
                                                         </td>
 
                                                         <td className="py-2">
-                                                            {isEditing ? (
+                                                            {isEditing && canEditBbt ? (
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
@@ -402,7 +445,7 @@ export default function Bbt({
                                                                     placeholder="Temp °C"
                                                                     className="w-32 rounded border px-2 py-1 text-sm"
                                                                 />
-                                                            ) : !reading.id ? (
+                                                            ) : !reading.id && canEditBbt ? (
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
@@ -416,76 +459,80 @@ export default function Bbt({
                                                                     placeholder="Temp °C"
                                                                     className="w-32 rounded border px-2 py-1 text-sm"
                                                                 />
-                                                            ) : (
+                                                            ) : reading.temperature !== null ? (
                                                                 <span>
                                                                     {Number(reading.temperature).toFixed(2)}°C
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    —
                                                                 </span>
                                                             )}
                                                         </td>
 
-                                                        <td className="py-2">
-                                                            <div className="flex gap-2">
-                                                                {isEditing || !reading.id ? (
-                                                                    <>
-                                                                        <button 
-                                                                            type="button"
-                                                                            className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
-                                                                            onClick={() => saveReading(reading)}
-                                                                        >
-                                                                            {reading.id ? 'Save' : 'Add'}
-                                                                        </button>
+                                                        {canEditBbt && (
+                                                            <td className="py-2">
+                                                                <div className="flex gap-2">
+                                                                    {isEditing || !reading.id ? (
+                                                                        <>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
+                                                                                onClick={() => saveReading(reading)}
+                                                                            >
+                                                                                {reading.id ? 'Save' : 'Add'}
+                                                                            </button>
 
-                                                                        {isEditing && (
+                                                                            {isEditing && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={resetInlineEdit}
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
                                                                             <button
                                                                                 type="button"
                                                                                 className="rounded border px-2 py-1 text-xs"
-                                                                                onClick={resetInlineEdit}
+                                                                                onClick={() => {
+                                                                                    setEditingDate(reading.date);
+                                                                                    setTableTemperature(
+                                                                                        String(reading.temperature ?? '')
+                                                                                    );
+                                                                                }}
                                                                             >
-                                                                                Cancel
+                                                                                Edit
                                                                             </button>
-                                                                        )}
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="rounded border px-2 py-1 text-xs"
-                                                                            onClick={() => {
-                                                                                setEditingDate(reading.date);
-                                                                                setTableTemperature(
-                                                                                    String(reading.temperature ?? '')
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Edit
-                                                                        </button>
 
-                                                                        <button
-                                                                            type="button"
-                                                                            className="rounded border px-2 py-1 text-xs"
-                                                                            onClick={() => {
-                                                                                if (!reading.id) return;
+                                                                            <button
+                                                                                type="button"
+                                                                                className="rounded border px-2 py-1 text-xs"
+                                                                                onClick={() => {
+                                                                                    if (!reading.id) return;
 
-                                                                                if (!confirm('Delete this BBT reading?')) return;
+                                                                                    if (!confirm('Delete this BBT reading?')) return;
 
-                                                                                router.delete(`/bbt/${reading.id}`, {
-                                                                                    preserveScroll: true,
-                                                                                    onSuccess: resetInlineEdit,
-                                                                                });
-                                                                            }}
-                                                                        >
-                                                                            Delete
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
+                                                                                    router.delete(`/bbt/${reading.id}${ownerQuery}`, {
+                                                                                        preserveScroll: true,
+                                                                                        onSuccess: resetInlineEdit,
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
-
-
                                     </table>
 
                                     {errors?.temperature && (
@@ -508,7 +555,6 @@ export default function Bbt({
                         </div>
                     </>
                 )}
-
             </div>
         </AppLayout>
     );
