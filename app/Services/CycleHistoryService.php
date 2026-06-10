@@ -15,9 +15,24 @@ class CycleHistoryService
     public function buildCalendarData(
         Collection $cycles,
         Collection $bbtReadings,
-        Collection $symptoms
+        Collection $symptoms,
+        array $permissions = []
     ): array
     {
+        $permissions = array_merge([
+            'can_view_cycles' => true,
+            'can_edit_cycles' => true,
+
+            'can_view_bbt' => true,
+            'can_edit_bbt' => true,
+
+            'can_view_symptoms' => true,
+            'can_edit_symptoms' => true,
+
+            'can_view_predictions' => true,
+            'can_view_insights' => true,
+        ], $permissions);
+
         if ($cycles->count() < 2) {
             return [];
         }
@@ -92,25 +107,35 @@ class CycleHistoryService
                     |--------------------------------------------------------------------------
                     */
 
-                    $calendarDays[$key][] = [
-                        'type' => 'ongoing_actual_period',
-                        'label' => 'Ongoing Period',
-                        'color' => 'pink',
-                        'editable' => true,
-                        'cycle_id' => $cycle->id,
-                        'is_latest_cycle' => $isLatestCycle,
-                        'is_estimated' => true,
-                    ];
-
-                    if ($d === 0) {
-                        $calendarDays[$key][] = [
-                            'type' => 'day_one_actual_period',
-                            'label' => 'Day One',
-                            'color' => 'red',
-                            'editable' => true,
+                    $calendarDays[$key][] = $permissions['can_view_cycles']
+                        ? [
+                            'type' => 'ongoing_actual_period',
+                            'label' => 'Ongoing Period',
+                            'color' => 'pink',
+                            'editable' => $permissions['can_edit_cycles'],
                             'cycle_id' => $cycle->id,
                             'is_latest_cycle' => $isLatestCycle,
+                            'is_estimated' => true,
+                        ]
+                        : [
+                            'type' => 'locked_cycles',
+                            'label' => 'Cycle data locked',
+                            'color' => 'gray',
+                            'locked' => true,
+                            'data_group' => 'cycles',
                         ];
+
+                    if ($d === 0) {
+                        if ($permissions['can_view_cycles']) {
+                            $calendarDays[$key][] = [
+                                'type' => 'day_one_actual_period',
+                                'label' => 'Day One',
+                                'color' => 'red',
+                                'editable' => $permissions['can_edit_cycles'],
+                                'cycle_id' => $cycle->id,
+                                'is_latest_cycle' => $isLatestCycle,
+                            ];
+                        }
                     }
                 }
 
@@ -135,24 +160,34 @@ class CycleHistoryService
                     $calendarDays[$key] = [];
                 }
 
-                $calendarDays[$key][] = [
-                    'type' => 'actual_period',
-                    'label' => 'Actual Period',
-                    'color' => 'pink',
-                    'editable' => true,
-                    'cycle_id' => $cycle->id,
-                    'is_latest_cycle' => $isLatestCycle,
-                ];
-
-                if ($d === 0) {
-                    $calendarDays[$key][] = [
-                        'type' => 'day_one_actual_period',
-                        'label' => 'Day One',
-                        'color' => 'red',
-                        'editable' => true,
+                $calendarDays[$key][] = $permissions['can_view_cycles']
+                    ? [
+                        'type' => 'actual_period',
+                        'label' => 'Actual Period',
+                        'color' => 'pink',
+                        'editable' => $permissions['can_edit_cycles'],
                         'cycle_id' => $cycle->id,
                         'is_latest_cycle' => $isLatestCycle,
+                    ]
+                    : [
+                        'type' => 'locked_cycles',
+                        'label' => 'Cycle data locked',
+                        'color' => 'gray',
+                        'locked' => true,
+                        'data_group' => 'cycles',
                     ];
+
+                if ($d === 0) {
+                    if ($permissions['can_view_cycles']) {
+                        $calendarDays[$key][] = [
+                            'type' => 'day_one_actual_period',
+                            'label' => 'Day One',
+                            'color' => 'red',
+                            'editable' => $permissions['can_edit_cycles'],
+                            'cycle_id' => $cycle->id,
+                            'is_latest_cycle' => $isLatestCycle,
+                        ];
+                    }
                 }
             }
         }
@@ -187,22 +222,32 @@ class CycleHistoryService
                 $calendarDays[$key] = [];
             }
 
-            $calendarDays[$key][] = [
-                'type' => 'predicted_period',
-                'label' => 'Predicted Period',
-                'color' => 'light_pink',
-                'editable' => true,
-                'is_prediction' => true,
-            ];
+            $calendarDays[$key][] = $permissions['can_view_predictions']
+                ? [
+                    'type' => 'predicted_period',
+                    'label' => 'Predicted Period',
+                    'color' => 'light_pink',
+                    'editable' => $permissions['can_edit_cycles'],
+                    'is_prediction' => true,
+                ]
+                : [
+                    'type' => 'locked_predictions',
+                    'label' => 'Prediction locked',
+                    'color' => 'gray',
+                    'locked' => true,
+                    'data_group' => 'predictions',
+                ];
 
             if ($d === 0) {
-                $calendarDays[$key][] = [
-                    'type' => 'day_one_predicted_period',
-                    'label' => 'Predicted Day One',
-                    'color' => 'light_red',
-                    'editable' => true,
-                    'is_prediction' => true,
-                ];
+                if ($permissions['can_view_predictions']) {
+                    $calendarDays[$key][] = [
+                        'type' => 'day_one_predicted_period',
+                        'label' => 'Predicted Day One',
+                        'color' => 'light_red',
+                        'editable' => $permissions['can_edit_cycles'],
+                        'is_prediction' => true,
+                    ];
+                }
             }
         }
 
@@ -220,11 +265,19 @@ class CycleHistoryService
             $calendarDays[$key] = [];
         }
 
-        $calendarDays[$key][] = [
-            'type' => 'predicted_ovulation',
-            'label' => 'Predicted Ovulation',
-            'color' => 'blue',
-        ];
+        $calendarDays[$key][] = $permissions['can_view_predictions']
+            ? [
+                'type' => 'predicted_ovulation',
+                'label' => 'Predicted Ovulation',
+                'color' => 'blue',
+            ]
+            : [
+                'type' => 'locked_predictions',
+                'label' => 'Prediction locked',
+                'color' => 'gray',
+                'locked' => true,
+                'data_group' => 'predictions',
+            ];
 
         /*
         |--------------------------------------------------------------------------
@@ -245,11 +298,19 @@ class CycleHistoryService
                 $calendarDays[$key] = [];
             }
 
-            $calendarDays[$key][] = [
-                'type' => 'predicted_fertile_window',
-                'label' => 'Predicted Ovulation Window',
-                'color' => 'sky',
-            ];
+            $calendarDays[$key][] = $permissions['can_view_predictions']
+                ? [
+                    'type' => 'predicted_fertile_window',
+                    'label' => 'Predicted Ovulation Window',
+                    'color' => 'sky',
+                ]
+                : [
+                    'type' => 'locked_predictions',
+                    'label' => 'Prediction locked',
+                    'color' => 'gray',
+                    'locked' => true,
+                    'data_group' => 'predictions',
+                ];
         }
 
         /*
@@ -281,11 +342,19 @@ class CycleHistoryService
                     $calendarDays[$key] = [];
                 }
 
-                $calendarDays[$key][] = [
-                    'type' => 'predicted_safe_day',
-                    'label' => 'Potential Safe Day',
-                    'color' => 'light_green',
-                ];
+                $calendarDays[$key][] = $permissions['can_view_predictions']
+                    ? [
+                        'type' => 'predicted_safe_day',
+                        'label' => 'Potential Safe Day',
+                        'color' => 'light_green',
+                    ]
+                    : [
+                        'type' => 'locked_predictions',
+                        'label' => 'Prediction locked',
+                        'color' => 'gray',
+                        'locked' => true,
+                        'data_group' => 'predictions',
+                    ];
             }
         }
 
@@ -305,11 +374,19 @@ class CycleHistoryService
             $calendarDays[$key] = [];
         }
 
-        $calendarDays[$key][] = [
-            'type' => 'pregnancy_test',
-            'label' => 'Take PPT when missed period',
-            'color' => 'light_orange',
-        ];
+        $calendarDays[$key][] = $permissions['can_view_predictions']
+            ? [
+                'type' => 'pregnancy_test',
+                'label' => 'Take PPT when missed period',
+                'color' => 'light_orange',
+            ]
+            : [
+                'type' => 'locked_predictions',
+                'label' => 'Prediction locked',
+                'color' => 'gray',
+                'locked' => true,
+                'data_group' => 'predictions',
+            ];
 
         /*
         |--------------------------------------------------------------------------
@@ -347,11 +424,19 @@ class CycleHistoryService
                     $calendarDays[$key] = [];
                 }
 
-                $calendarDays[$key][] = [
-                    'type' => 'fertile_window',
-                    'label' => 'Ovulation Window',
-                    'color' => 'sky',
-                ];
+                $calendarDays[$key][] = $permissions['can_view_predictions']
+                    ? [
+                        'type' => 'fertile_window',
+                        'label' => 'Ovulation Window',
+                        'color' => 'sky',
+                    ]
+                    : [
+                        'type' => 'locked_predictions',
+                        'label' => 'Prediction locked',
+                        'color' => 'gray',
+                        'locked' => true,
+                        'data_group' => 'predictions',
+                    ];
             }
 
             /*
@@ -366,11 +451,19 @@ class CycleHistoryService
                 $calendarDays[$key] = [];
             }
 
-            $calendarDays[$key][] = [
-                'type' => 'ovulation',
-                'label' => 'Ovulation',
-                'color' => 'blue',
-            ];
+            $calendarDays[$key][] = $permissions['can_view_predictions']
+                ? [
+                    'type' => 'ovulation',
+                    'label' => 'Ovulation',
+                    'color' => 'blue',
+                ]
+                : [
+                    'type' => 'locked_predictions',
+                    'label' => 'Prediction locked',
+                    'color' => 'gray',
+                    'locked' => true,
+                    'data_group' => 'predictions',
+                ];
         }
 
         /*
@@ -386,13 +479,21 @@ class CycleHistoryService
                 $calendarDays[$key] = [];
             }
 
-            $calendarDays[$key][] = [
-                'type' => 'bbt',
-                'label' => $reading->temperature . '°C',
-                'color' => 'gray',
-                'bbt_id' => $reading->id,
-                'temperature' => $reading->temperature,
-            ];
+            $calendarDays[$key][] = $permissions['can_view_bbt']
+                ? [
+                    'type' => 'bbt',
+                    'label' => $reading->temperature . '°C',
+                    'color' => 'gray',
+                    'bbt_id' => $reading->id,
+                    'temperature' => $reading->temperature,
+                ]
+                : [
+                    'type' => 'locked_bbt',
+                    'label' => 'BBT locked',
+                    'color' => 'gray',
+                    'locked' => true,
+                    'data_group' => 'bbt',
+                ];
         }
 
         /*
@@ -408,15 +509,23 @@ class CycleHistoryService
                 $calendarDays[$key] = [];
             }
 
-            $calendarDays[$key][] = [
-                'type' => 'symptom',
-                'label' => $symptom->type . ' ' . str_repeat('★', $symptom->level),
-                'color' => 'purple',
-                'symptom_id' => $symptom->id,
-                'symptom_type' => $symptom->type,
-                'level' => $symptom->level,
-                'notes' => $symptom->notes,
-            ];
+            $calendarDays[$key][] = $permissions['can_view_symptoms']
+                ? [
+                    'type' => 'symptom',
+                    'label' => $symptom->type . ' ' . str_repeat('★', $symptom->level),
+                    'color' => 'purple',
+                    'symptom_id' => $symptom->id,
+                    'symptom_type' => $symptom->type,
+                    'level' => $symptom->level,
+                    'notes' => $symptom->notes,
+                ]
+                : [
+                    'type' => 'locked_symptom',
+                    'label' => 'Symptoms locked',
+                    'color' => 'gray',
+                    'locked' => true,
+                    'data_group' => 'symptoms',
+                ];
         }
 
         // dd($calendarDays);

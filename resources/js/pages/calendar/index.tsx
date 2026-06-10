@@ -90,6 +90,9 @@ export default function Calendar({
     defaultMonth,
 }: Props) {
 
+    console.log("Calendar Data:", calendarData);
+    console.log("Data Access:", usePage().props.dataAccess);
+
     const formatDateKey = (date: Date) => {
 
         const year = date.getFullYear();
