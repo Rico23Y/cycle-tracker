@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -72,6 +72,26 @@ type Timeline = {
 
 type Props = {
     timelines: Timeline[];
+    cycleLocked?: boolean;
+};
+
+type DataAccess = {
+    owner_key: string;
+    owner_label: string;
+    is_self: boolean;
+    permissions: {
+        can_view_cycles: boolean;
+        can_edit_cycles: boolean;
+
+        can_view_bbt: boolean;
+        can_edit_bbt: boolean;
+
+        can_view_symptoms: boolean;
+        can_edit_symptoms: boolean;
+
+        can_view_predictions: boolean;
+        can_view_insights: boolean;
+    };
 };
 
 const PHASE_COLOR_MAP: Record<string, string> = {
@@ -83,7 +103,25 @@ const PHASE_COLOR_MAP: Record<string, string> = {
 
 export default function Cycle({
     timelines,
+    cycleLocked = false,
 }: Props) {
+    const { dataAccess } = usePage().props as {
+        dataAccess?: DataAccess;
+    };
+
+    console.log('cycles props', {
+        cycleLocked,
+        timelines,
+        dataAccess,
+    });
+
+    const permissions = dataAccess?.permissions;
+
+    const canViewCycles = permissions?.can_view_cycles ?? true;
+    const canEditCycles = permissions?.can_edit_cycles ?? true;
+    const canViewSymptoms = permissions?.can_view_symptoms ?? true;
+    const canViewPredictions = permissions?.can_view_predictions ?? true;
+
     const [selectedTimelineId, setSelectedTimelineId] = useState(
         timelines.length > 0 ? timelines[timelines.length - 1].id : ''
     );
@@ -94,12 +132,31 @@ export default function Cycle({
         ) ?? null;
     }, [timelines, selectedTimelineId]);
 
+    if (cycleLocked || !canViewCycles) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Cycles" />
+
+                <div className="p-4">
+                    <div className="rounded-xl border p-6">
+                        <h1 className="text-xl font-semibold">
+                            Cycles Locked
+                        </h1>
+
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            The owner has not allowed access to cycle records.
+                        </p>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cycles" />
 
             <div className="space-y-4 p-4">
-
                 <div>
                     <h1 className="text-xl font-semibold">
                         {timeline?.current_cycle_day
@@ -108,9 +165,21 @@ export default function Cycle({
                     </h1>
 
                     <p className="text-sm text-muted-foreground">
-                        Estimated cycle phases and hormone-style trends.
+                        Viewing {dataAccess?.owner_label ?? 'My Data'}.
                     </p>
+
+                    {!canEditCycles && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            You can view cycle records, but editing is locked by the owner.
+                        </p>
+                    )}
                 </div>
+
+                {!canViewPredictions && (
+                    <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                        🔒 Prediction-related details are locked by the owner.
+                    </div>
+                )}
 
                 {timelines.length === 0 || !timeline ? (
                     <div className="rounded-xl border p-4 text-sm text-muted-foreground">
@@ -118,7 +187,6 @@ export default function Cycle({
                     </div>
                 ) : (
                     <>
-
                         {timelines.length > 0 && (
                             <div className="rounded-xl border p-4">
                                 <div className="mb-2 text-sm font-medium">
@@ -139,7 +207,6 @@ export default function Cycle({
                             </div>
                         )}
 
-                        {/* SUMMARY CARDS */}
                         <div className="grid gap-4 md:grid-cols-3">
                             <div className="rounded-xl border p-4">
                                 <div className="text-sm text-muted-foreground">
@@ -164,18 +231,26 @@ export default function Cycle({
                                     Ovulation
                                 </div>
 
-                                <div className="mt-2 text-xl font-semibold">
-                                    Day {timeline.ovulation_day}
-                                </div>
+                                {canViewPredictions ? (
+                                    <>
+                                        <div className="mt-2 text-xl font-semibold">
+                                            Day {timeline.ovulation_day}
+                                        </div>
 
-                                <div className="text-sm text-muted-foreground">
-                                    {new Date(timeline.ovulation_date + 'T00:00:00')
-                                        .toLocaleDateString('en-US', {
-                                            month: 'long',
-                                            day: 'numeric',
-                                            year: 'numeric',
-                                        })}
-                                </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {new Date(timeline.ovulation_date + 'T00:00:00')
+                                                .toLocaleDateString('en-US', {
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                })}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                        🔒 Locked
+                                    </div>
+                                )}
                             </div>
 
                             <div className="rounded-xl border p-4">
@@ -183,22 +258,29 @@ export default function Cycle({
                                     Pregnancy Test
                                 </div>
 
-                                <div className="mt-2 text-xl font-semibold">
-                                    {new Date(timeline.pregnancy_test_date + 'T00:00:00')
-                                        .toLocaleDateString('en-US', {
-                                            month: 'long',
-                                            day: 'numeric',
-                                            year: 'numeric',
-                                        })}
-                                </div>
+                                {canViewPredictions ? (
+                                    <>
+                                        <div className="mt-2 text-xl font-semibold">
+                                            {new Date(timeline.pregnancy_test_date + 'T00:00:00')
+                                                .toLocaleDateString('en-US', {
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                })}
+                                        </div>
 
-                                <div className="text-sm text-muted-foreground">
-                                    If period is missed
-                                </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            If period is missed
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                        🔒 Locked
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* PHASE BAR */}
                         <div className="rounded-xl border p-4 space-y-4">
                             <h2 className="font-semibold">
                                 Cycle Phases
@@ -260,98 +342,106 @@ export default function Cycle({
                             </div>
                         </div>
 
-                        {/* HORMONE STYLE GRAPH */}
-                        <div className="rounded-xl border p-4 space-y-4">
-                            <div>
-                                <h2 className="font-semibold">
-                                    Estimated Hormone Pattern
-                                </h2>
+                        {canViewPredictions ? (
+                            <div className="rounded-xl border p-4 space-y-4">
+                                <div>
+                                    <h2 className="font-semibold">
+                                        Estimated Hormone Pattern
+                                    </h2>
 
-                                <p className="text-sm text-muted-foreground">
-                                    Relative visual estimates only. These are not measured hormone levels.
-                                </p>
-                            </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Relative visual estimates only. These are not measured hormone levels.
+                                    </p>
+                                </div>
 
-                            <div className="h-[320px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={timeline.hormone_estimates}>
-                                        <XAxis
-                                            dataKey="day"
-                                            tickFormatter={(day) => `D${day}`}
-                                        />
-
-                                        <YAxis
-                                            domain={[0, 100]}
-                                            tickFormatter={(value) => `${value}`}
-                                        />
-
-                                        <Tooltip
-                                            labelFormatter={(day) => `Cycle Day ${day}`}
-                                        />
-
-                                        {timeline.current_cycle_day && (
-                                            <ReferenceLine
-                                                x={timeline.current_cycle_day}
-                                                label="Today"
+                                <div className="h-[320px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={timeline.hormone_estimates}>
+                                            <XAxis
+                                                dataKey="day"
+                                                tickFormatter={(day) => `D${day}`}
                                             />
-                                        )}
 
-                                        <ReferenceLine
-                                            x={timeline.ovulation_day}
-                                            label="Ovulation"
-                                        />
+                                            <YAxis
+                                                domain={[0, 100]}
+                                                tickFormatter={(value) => `${value}`}
+                                            />
 
-                                        <Area
-                                            type="monotone"
-                                            dataKey="estrogen"
-                                            name="Estrogen"
-                                            stroke="#ec4899"
-                                            fill="#ec4899"
-                                            fillOpacity={0.18}
-                                            dot={false}
-                                        />
+                                            <Tooltip
+                                                labelFormatter={(day) => `Cycle Day ${day}`}
+                                            />
 
-                                        <Area
-                                            type="monotone"
-                                            dataKey="lh"
-                                            name="LH"
-                                            stroke="#f97316"
-                                            fill="#f97316"
-                                            fillOpacity={0.18}
-                                            dot={false}
-                                        />
+                                            {timeline.current_cycle_day && (
+                                                <ReferenceLine
+                                                    x={timeline.current_cycle_day}
+                                                    label="Today"
+                                                />
+                                            )}
 
-                                        <Area
-                                            type="monotone"
-                                            dataKey="fsh"
-                                            name="FSH"
-                                            stroke="#3b82f6"
-                                            fill="#3b82f6"
-                                            fillOpacity={0.18}
-                                            dot={false}
-                                        />
+                                            <ReferenceLine
+                                                x={timeline.ovulation_day}
+                                                label="Ovulation"
+                                            />
 
-                                        <Area
-                                            type="monotone"
-                                            dataKey="progesterone"
-                                            name="Progesterone"
-                                            stroke="#22c55e"
-                                            fill="#22c55e"
-                                            fillOpacity={0.18}
-                                            dot={false}
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
+                                            <Area
+                                                type="monotone"
+                                                dataKey="estrogen"
+                                                name="Estrogen"
+                                                stroke="#ec4899"
+                                                fill="#ec4899"
+                                                fillOpacity={0.18}
+                                                dot={false}
+                                            />
+
+                                            <Area
+                                                type="monotone"
+                                                dataKey="lh"
+                                                name="LH"
+                                                stroke="#f97316"
+                                                fill="#f97316"
+                                                fillOpacity={0.18}
+                                                dot={false}
+                                            />
+
+                                            <Area
+                                                type="monotone"
+                                                dataKey="fsh"
+                                                name="FSH"
+                                                stroke="#3b82f6"
+                                                fill="#3b82f6"
+                                                fillOpacity={0.18}
+                                                dot={false}
+                                            />
+
+                                            <Area
+                                                type="monotone"
+                                                dataKey="progesterone"
+                                                name="Progesterone"
+                                                stroke="#22c55e"
+                                                fill="#22c55e"
+                                                fillOpacity={0.18}
+                                                dot={false}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                                🔒 Estimated hormone pattern is locked because prediction access is disabled.
+                            </div>
+                        )}
 
-                        {/* SYMPTOMS */}
                         <div className="rounded-xl border p-4 space-y-4">
                             <h2 className="font-semibold">
                                 Symptoms
                             </h2>
 
-                            {timeline.symptoms.length > 0 ? (
+                            {!canViewSymptoms ? (
+                                <div className="text-sm text-muted-foreground">
+                                    🔒 Symptoms are locked by the owner.
+                                </div>
+                            ) : timeline.symptoms.length > 0 ? (
                                 <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                                     {timeline.symptoms.map((symptom) => (
                                         <div
@@ -387,7 +477,6 @@ export default function Cycle({
                         </div>
                     </>
                 )}
-
             </div>
         </AppLayout>
     );
