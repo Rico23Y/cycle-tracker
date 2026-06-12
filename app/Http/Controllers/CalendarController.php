@@ -54,8 +54,10 @@ class CalendarController extends Controller
             'bbtReadings' => $permissions['can_view_bbt'] ? $bbtReadings : [],
             'symptoms' => $permissions['can_view_symptoms'] ? $symptoms : [],
             'calendarData' => $calendarData,
-
             'defaultMonth' => $prediction['predicted_period_date'] ?? now()->toDateString(),
+
+            'cycleCount' => $cycles->count(),
+            'canEditCycles' => $permissions['can_edit_cycles'],
         ]);
     }
 

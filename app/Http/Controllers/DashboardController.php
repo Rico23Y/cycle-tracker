@@ -40,6 +40,9 @@ class DashboardController extends Controller
             'readings' => $readings,
             'nextPeriod' => $nextPeriod,
 
+            'cycleCount' => $cycles->count(),
+            'canEditCycles' => $permissions['can_edit_cycles'],
+
             'bbtLocked' => ! $permissions['can_view_bbt'],
             'predictionsLocked' => ! $permissions['can_view_predictions'],
             'canEditBbt' => $permissions['can_edit_bbt'],

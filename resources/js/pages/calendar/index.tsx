@@ -65,6 +65,9 @@ type Props = {
     symptoms: Symptom[];
     calendarData: CalendarData;
     defaultMonth: string;
+
+    cycleCount: number;
+    canEditCycles: boolean;
 };
 
 type DataAccess = {
@@ -109,6 +112,8 @@ const getBgColor = (color: EventColor | string): string => {
 export default function Calendar({
     calendarData,
     defaultMonth,
+    cycleCount = 0,
+    canEditCycles: canEditCyclesFromServer = true,
 }: Props) {
     const { errors, dataAccess } = usePage().props as {
         errors?: Record<string, string>;
@@ -117,7 +122,9 @@ export default function Calendar({
 
     const permissions = dataAccess?.permissions;
 
-    const canEditCycles = permissions?.can_edit_cycles ?? true;
+    const canEditCycles =
+        canEditCyclesFromServer &&
+        (permissions?.can_edit_cycles ?? true);
     const canViewBbt = permissions?.can_view_bbt ?? true;
     const canEditBbt = permissions?.can_edit_bbt ?? true;
     const canViewSymptoms = permissions?.can_view_symptoms ?? true;
@@ -193,6 +200,11 @@ export default function Calendar({
     const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
     const [actionDate, setActionDate] = useState('');
 
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    const [newCycleStartDate, setNewCycleStartDate] = useState(todayKey);
+    const [newCyclePeriodLength, setNewCyclePeriodLength] = useState('');
+
     function resetActionForm() {
         setActiveAction(null);
         setActiveEvent(null);
@@ -202,6 +214,109 @@ export default function Calendar({
         setCustomSymptomType('');
         setSymptomLevel('1');
         setSymptomNotes('');
+    }
+
+    if (cycleCount === 0) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Calendar" />
+
+                <div className="p-4">
+                    <form
+                        className="mx-auto max-w-xl rounded-xl border p-6 space-y-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+
+                            if (!canEditCycles) return;
+
+                            router.post(
+                                `/cycles${ownerQuery}`,
+                                {
+                                    start_date: newCycleStartDate,
+                                    period_length: newCyclePeriodLength || null,
+                                },
+                                {
+                                    preserveScroll: true,
+                                }
+                            );
+                        }}
+                    >
+                        <div>
+                            <h1 className="text-xl font-semibold">
+                                Start tracking your cycle
+                            </h1>
+
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Add your first Day One to start using the calendar. Period length and BBT can be added later.
+                            </p>
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Viewing {dataAccess?.owner_label ?? 'My Data'}.
+                            </p>
+                        </div>
+
+                        {canEditCycles ? (
+                            <>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Day One
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            value={newCycleStartDate}
+                                            onChange={(e) => setNewCycleStartDate(e.target.value)}
+                                            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                                            required
+                                        />
+
+                                        {errors?.start_date && (
+                                            <div className="mt-1 text-sm text-red-500">
+                                                {errors.start_date}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Period length optional
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="15"
+                                            value={newCyclePeriodLength}
+                                            onChange={(e) => setNewCyclePeriodLength(e.target.value)}
+                                            placeholder="Example: 5"
+                                            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                                        />
+
+                                        {errors?.period_length && (
+                                            <div className="mt-1 text-sm text-red-500">
+                                                {errors.period_length}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="rounded bg-blue-500 px-4 py-2 text-sm text-white"
+                                >
+                                    Add Day One
+                                </button>
+                            </>
+                        ) : (
+                            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                Cycle editing is locked by the owner.
+                            </div>
+                        )}
+                    </form>
+                </div>
+            </AppLayout>
+        );
     }
 
     return (

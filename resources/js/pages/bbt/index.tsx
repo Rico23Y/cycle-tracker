@@ -41,11 +41,19 @@ type BbtTimeline = {
 
 type Props = {
     timelines: BbtTimeline[];
+    readings: {
+        id: number;
+        date: string;
+        temperature: number;
+    }[];
+    cycleCount: number;
     bbtLocked?: boolean;
 };
 
 export default function Bbt({
     timelines,
+    readings,
+    cycleCount,
     bbtLocked = false,
 }: Props) {
     const { errors, dataAccess } = usePage().props as {
@@ -85,11 +93,19 @@ export default function Bbt({
         return timelines.find((item) => item.id === selectedTimelineId) ?? null;
     }, [timelines, selectedTimelineId]);
 
-    const existingReadingForQuickDate = timelines
-        .flatMap((item) => item.readings)
-        .find((reading) => {
-            return reading.date === quickDate && reading.id !== null;
-        });
+    const allVisibleReadings = [
+        ...timelines.flatMap((item) => item.readings),
+        ...readings.map((reading) => ({
+            id: reading.id,
+            date: reading.date,
+            cycle_day: 0,
+            temperature: reading.temperature,
+        })),
+    ];
+
+    const existingReadingForQuickDate = allVisibleReadings.find((reading) => {
+        return reading.date === quickDate && reading.id !== null;
+    });
 
     const chartData = timeline
         ? timeline.readings.filter(
@@ -97,6 +113,16 @@ export default function Bbt({
                 reading.temperature !== null
         )
         : [];
+
+    const simpleChartData = [...readings]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((reading) => ({
+            date: reading.date,
+            temp: Number(reading.temperature),
+        }));
+
+    const useSimpleBbtMode =
+        timelines.length === 0 || !timeline;
 
     function resetInlineEdit() {
         setEditingDate(null);
@@ -226,104 +252,24 @@ export default function Bbt({
                     </div>
                 )}
 
-                {timelines.length === 0 || !timeline ? (
-                    <div className="rounded-xl border p-4 text-sm text-muted-foreground">
-                        Not enough cycle data yet. Add at least two cycle start dates.
-                    </div>
-                ) : (
+                {useSimpleBbtMode ? (
                     <>
-                        <div className="rounded-xl border p-4">
-                            <div className="mb-2 text-sm font-medium">
-                                Select Cycle Range
-                            </div>
-
-                            <select
-                                value={selectedTimelineId}
-                                onChange={(e) => {
-                                    setSelectedTimelineId(e.target.value);
-                                    resetInlineEdit();
-                                }}
-                                className="w-full rounded border px-3 py-2 text-sm"
-                            >
-                                {timelines.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="rounded-xl border p-4 space-y-4">
+                        <div className="rounded-xl border p-4 space-y-3">
                             <div>
                                 <h2 className="font-semibold">
-                                    BBT Chart
+                                    BBT Records
                                 </h2>
 
                                 <p className="text-sm text-muted-foreground">
-                                    Cycle Day 1 to Day {timeline.cycle_length}
+                                    You can log BBT even before there are enough cycle records for cycle-day tracking.
                                 </p>
                             </div>
 
-                            <div className="h-[320px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData}>
-                                        <XAxis
-                                            dataKey="cycle_day"
-                                            tickFormatter={(day) => `D${day}`}
-                                        />
-
-                                        <YAxis
-                                            domain={[
-                                                (dataMin: number) =>
-                                                    Math.floor((dataMin - 0.2) * 100) / 100,
-                                                (dataMax: number) =>
-                                                    Math.ceil((dataMax + 0.2) * 100) / 100,
-                                            ]}
-                                            tickFormatter={(value: number) => value.toFixed(2)}
-                                        />
-
-                                        <Tooltip
-                                            labelFormatter={(day) => `Cycle Day ${day}`}
-                                            formatter={(value) => [
-                                                `${Number(value).toFixed(2)}°C`,
-                                                'Temperature',
-                                            ]}
-                                        />
-
-                                        <ReferenceLine
-                                            x={1}
-                                            label="Day One"
-                                        />
-
-                                        <Line
-                                            type="monotone"
-                                            dataKey="temperature"
-                                            name="Temperature"
-                                            stroke="#3b82f6"
-                                            strokeWidth={2}
-                                            dot
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-
-                            <div className="text-sm text-muted-foreground">
-                                Cycle starts on{' '}
-                                {new Date(timeline.cycle_start_date + 'T00:00:00')
-                                    .toLocaleDateString('en-US', {
-                                        month: 'long',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                    })}
-                                {' '}and ends before{' '}
-                                {new Date(timeline.next_period_date + 'T00:00:00')
-                                    .toLocaleDateString('en-US', {
-                                        month: 'long',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                    })}
-                                .
-                            </div>
+                            {cycleCount < 2 && (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    Cycle-day timeline will appear after at least two cycle start dates are added.
+                                </div>
+                            )}
                         </div>
 
                         {canEditBbt && (
@@ -333,7 +279,7 @@ export default function Bbt({
                             >
                                 <div>
                                     <h2 className="font-semibold">
-                                        Quick Add BBT
+                                        Add BBT
                                     </h2>
 
                                     <p className="text-sm text-muted-foreground">
@@ -386,25 +332,384 @@ export default function Bbt({
                             </form>
                         )}
 
+                        {simpleChartData.length > 0 ? (
+                            <div className="rounded-xl border p-4 space-y-4">
+                                <div>
+                                    <h2 className="font-semibold">
+                                        BBT Chart
+                                    </h2>
+
+                                    <p className="text-sm text-muted-foreground">
+                                        Date-based temperature trend.
+                                    </p>
+                                </div>
+
+                                <div className="h-[320px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={simpleChartData}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickFormatter={(date) => {
+                                                    const parsed = new Date(date + 'T00:00:00');
+
+                                                    return parsed.toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                    });
+                                                }}
+                                            />
+
+                                            <YAxis
+                                                domain={[
+                                                    (dataMin: number) =>
+                                                        Math.floor((dataMin - 0.2) * 100) / 100,
+                                                    (dataMax: number) =>
+                                                        Math.ceil((dataMax + 0.2) * 100) / 100,
+                                                ]}
+                                                tickFormatter={(value: number) => value.toFixed(2)}
+                                            />
+
+                                            <Tooltip
+                                                labelFormatter={(date) => {
+                                                    const parsed = new Date(String(date) + 'T00:00:00');
+
+                                                    return parsed.toLocaleDateString('en-US', {
+                                                        month: 'long',
+                                                        day: 'numeric',
+                                                        year: 'numeric',
+                                                    });
+                                                }}
+                                                formatter={(value) => [
+                                                    `${Number(value).toFixed(2)}°C`,
+                                                    'Temperature',
+                                                ]}
+                                            />
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="temp"
+                                                name="Temperature"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                                No BBT readings yet.
+                            </div>
+                        )}
+
                         <div className="rounded-xl border p-4 space-y-4">
                             <h2 className="font-semibold">
                                 BBT Readings
                             </h2>
 
-                            {timeline.readings.length > 0 ? (
+                            {readings.length > 0 ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b text-left">
                                                 <th className="py-2">
-                                                    Cycle Day
-                                                </th>
-                                                <th className="py-2">
                                                     Date
                                                 </th>
+
                                                 <th className="py-2">
                                                     Temperature
                                                 </th>
+
+                                                {canEditBbt && (
+                                                    <th className="py-2">
+                                                        Actions
+                                                    </th>
+                                                )}
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {[...readings]
+                                                .sort((a, b) => b.date.localeCompare(a.date))
+                                                .map((reading) => {
+                                                    const isEditing = editingDate === reading.date;
+
+                                                    return (
+                                                        <tr
+                                                            key={reading.date}
+                                                            className="border-b"
+                                                        >
+                                                            <td className="py-2">
+                                                                {new Date(reading.date + 'T00:00:00')
+                                                                    .toLocaleDateString('en-US', {
+                                                                        month: 'short',
+                                                                        day: 'numeric',
+                                                                        year: 'numeric',
+                                                                    })}
+                                                            </td>
+
+                                                            <td className="py-2">
+                                                                {isEditing && canEditBbt ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={tableTemperature}
+                                                                        onChange={(e) => setTableTemperature(e.target.value)}
+                                                                        placeholder="Temp °C"
+                                                                        className="w-32 rounded border px-2 py-1 text-sm"
+                                                                    />
+                                                                ) : (
+                                                                    <span>
+                                                                        {Number(reading.temperature).toFixed(2)}°C
+                                                                    </span>
+                                                                )}
+                                                            </td>
+
+                                                            {canEditBbt && (
+                                                                <td className="py-2">
+                                                                    <div className="flex gap-2">
+                                                                        {isEditing ? (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
+                                                                                    onClick={() => {
+                                                                                        router.put(
+                                                                                            `/bbt/${reading.id}${ownerQuery}`,
+                                                                                            {
+                                                                                                temperature: tableTemperature,
+                                                                                            },
+                                                                                            {
+                                                                                                preserveScroll: true,
+                                                                                                onSuccess: resetInlineEdit,
+                                                                                            }
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    Save
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={resetInlineEdit}
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={() => {
+                                                                                        setEditingDate(reading.date);
+                                                                                        setTableTemperature(String(reading.temperature ?? ''));
+                                                                                    }}
+                                                                                >
+                                                                                    Edit
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={() => {
+                                                                                        if (!confirm('Delete this BBT reading?')) return;
+
+                                                                                        router.delete(`/bbt/${reading.id}${ownerQuery}`, {
+                                                                                            preserveScroll: true,
+                                                                                            onSuccess: resetInlineEdit,
+                                                                                        });
+                                                                                    }}
+                                                                                >
+                                                                                    Delete
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    );
+                                                })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No BBT readings yet.
+                                </div>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="rounded-xl border p-4">
+                            <div className="mb-2 text-sm font-medium">
+                                Select Cycle Range
+                            </div>
+
+                            <select
+                                value={selectedTimelineId}
+                                onChange={(e) => {
+                                    setSelectedTimelineId(e.target.value);
+                                    resetInlineEdit();
+                                }}
+                                className="w-full rounded border px-3 py-2 text-sm"
+                            >
+                                {timelines.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {canEditBbt && (
+                            <form
+                                onSubmit={submitQuickAdd}
+                                className="rounded-xl border p-4 space-y-3"
+                            >
+                                <div>
+                                    <h2 className="font-semibold">
+                                        Add BBT
+                                    </h2>
+
+                                    <p className="text-sm text-muted-foreground">
+                                        Add or update a temperature reading by date.
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+                                    <input
+                                        type="date"
+                                        value={quickDate}
+                                        onChange={(e) => setQuickDate(e.target.value)}
+                                        className="rounded border px-3 py-2 text-sm"
+                                    />
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={quickTemperature}
+                                        onChange={(e) => setQuickTemperature(e.target.value)}
+                                        placeholder="Temperature °C"
+                                        className="rounded border px-3 py-2 text-sm"
+                                    />
+
+                                    <button
+                                        type="submit"
+                                        className="rounded bg-blue-500 px-4 py-2 text-sm text-white"
+                                    >
+                                        {existingReadingForQuickDate ? 'Update' : 'Add'}
+                                    </button>
+                                </div>
+
+                                {existingReadingForQuickDate && (
+                                    <div className="text-sm text-orange-600">
+                                        A BBT reading already exists for this date. Submitting will ask if you want to update it.
+                                    </div>
+                                )}
+
+                                {errors?.date && (
+                                    <div className="text-sm text-red-500">
+                                        {errors.date}
+                                    </div>
+                                )}
+
+                                {errors?.temperature && (
+                                    <div className="text-sm text-red-500">
+                                        {errors.temperature}
+                                    </div>
+                                )}
+                            </form>
+                        )}
+
+                        <div className="rounded-xl border p-4 space-y-4">
+                            <div>
+                                <h2 className="font-semibold">
+                                    BBT Chart
+                                </h2>
+
+                                <p className="text-sm text-muted-foreground">
+                                    Cycle-day temperature trend for the selected range.
+                                </p>
+                            </div>
+
+                            {chartData.length > 0 ? (
+                                <div className="h-[320px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={chartData}>
+                                            <XAxis
+                                                dataKey="cycle_day"
+                                                label={{
+                                                    value: 'Cycle Day',
+                                                    position: 'insideBottom',
+                                                    offset: -5,
+                                                }}
+                                            />
+
+                                            <YAxis
+                                                domain={[
+                                                    (dataMin: number) =>
+                                                        Math.floor((dataMin - 0.2) * 100) / 100,
+                                                    (dataMax: number) =>
+                                                        Math.ceil((dataMax + 0.2) * 100) / 100,
+                                                ]}
+                                                tickFormatter={(value: number) => value.toFixed(2)}
+                                            />
+
+                                            <Tooltip
+                                                labelFormatter={(cycleDay) => `Cycle Day ${cycleDay}`}
+                                                formatter={(value) => [
+                                                    `${Number(value).toFixed(2)}°C`,
+                                                    'Temperature',
+                                                ]}
+                                            />
+
+                                            {timeline && !timeline.is_predicted && (
+                                                <ReferenceLine
+                                                    x={14}
+                                                    strokeDasharray="3 3"
+                                                    label="Approx. ovulation"
+                                                />
+                                            )}
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="temperature"
+                                                name="Temperature"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No BBT readings for this selected range.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rounded-xl border p-4 space-y-4">
+                            <h2 className="font-semibold">
+                                Cycle-Day BBT Readings
+                            </h2>
+
+                            {timeline ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-left">
+                                                <th className="py-2">
+                                                    Date
+                                                </th>
+
+                                                <th className="py-2">
+                                                    Cycle Day
+                                                </th>
+
+                                                <th className="py-2">
+                                                    Temperature
+                                                </th>
+
                                                 {canEditBbt && (
                                                     <th className="py-2">
                                                         Actions
@@ -416,16 +721,13 @@ export default function Bbt({
                                         <tbody>
                                             {timeline.readings.map((reading) => {
                                                 const isEditing = editingDate === reading.date;
+                                                const draftValue = temperatureDrafts[reading.date] ?? '';
 
                                                 return (
                                                     <tr
                                                         key={reading.date}
                                                         className="border-b"
                                                     >
-                                                        <td className="py-2">
-                                                            Day {reading.cycle_day}
-                                                        </td>
-
                                                         <td className="py-2">
                                                             {new Date(reading.date + 'T00:00:00')
                                                                 .toLocaleDateString('en-US', {
@@ -436,33 +738,32 @@ export default function Bbt({
                                                         </td>
 
                                                         <td className="py-2">
-                                                            {isEditing && canEditBbt ? (
+                                                            Day {reading.cycle_day}
+                                                        </td>
+
+                                                        <td className="py-2">
+                                                            {reading.id && !isEditing ? (
+                                                                <span>
+                                                                    {Number(reading.temperature).toFixed(2)}°C
+                                                                </span>
+                                                            ) : canEditBbt && (isEditing || !reading.id) ? (
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
-                                                                    value={tableTemperature}
-                                                                    onChange={(e) => setTableTemperature(e.target.value)}
-                                                                    placeholder="Temp °C"
-                                                                    className="w-32 rounded border px-2 py-1 text-sm"
-                                                                />
-                                                            ) : !reading.id && canEditBbt ? (
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    value={temperatureDrafts[reading.date] ?? ''}
+                                                                    value={reading.id ? tableTemperature : draftValue}
                                                                     onChange={(e) => {
-                                                                        setTemperatureDrafts({
-                                                                            ...temperatureDrafts,
-                                                                            [reading.date]: e.target.value,
-                                                                        });
+                                                                        if (reading.id) {
+                                                                            setTableTemperature(e.target.value);
+                                                                        } else {
+                                                                            setTemperatureDrafts((current) => ({
+                                                                                ...current,
+                                                                                [reading.date]: e.target.value,
+                                                                            }));
+                                                                        }
                                                                     }}
                                                                     placeholder="Temp °C"
                                                                     className="w-32 rounded border px-2 py-1 text-sm"
                                                                 />
-                                                            ) : reading.temperature !== null ? (
-                                                                <span>
-                                                                    {Number(reading.temperature).toFixed(2)}°C
-                                                                </span>
                                                             ) : (
                                                                 <span className="text-muted-foreground">
                                                                     —
@@ -473,17 +774,17 @@ export default function Bbt({
                                                         {canEditBbt && (
                                                             <td className="py-2">
                                                                 <div className="flex gap-2">
-                                                                    {isEditing || !reading.id ? (
-                                                                        <>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
-                                                                                onClick={() => saveReading(reading)}
-                                                                            >
-                                                                                {reading.id ? 'Save' : 'Add'}
-                                                                            </button>
+                                                                    {reading.id ? (
+                                                                        isEditing ? (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
+                                                                                    onClick={() => saveReading(reading)}
+                                                                                >
+                                                                                    Save
+                                                                                </button>
 
-                                                                            {isEditing && (
                                                                                 <button
                                                                                     type="button"
                                                                                     className="rounded border px-2 py-1 text-xs"
@@ -491,40 +792,45 @@ export default function Bbt({
                                                                                 >
                                                                                     Cancel
                                                                                 </button>
-                                                                            )}
-                                                                        </>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={() => {
+                                                                                        setEditingDate(reading.date);
+                                                                                        setTableTemperature(String(reading.temperature ?? ''));
+                                                                                    }}
+                                                                                >
+                                                                                    Edit
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="rounded border px-2 py-1 text-xs"
+                                                                                    onClick={() => {
+                                                                                        if (!reading.id) return;
+                                                                                        if (!confirm('Delete this BBT reading?')) return;
+
+                                                                                        router.delete(`/bbt/${reading.id}${ownerQuery}`, {
+                                                                                            preserveScroll: true,
+                                                                                            onSuccess: resetInlineEdit,
+                                                                                        });
+                                                                                    }}
+                                                                                >
+                                                                                    Delete
+                                                                                </button>
+                                                                            </>
+                                                                        )
                                                                     ) : (
-                                                                        <>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="rounded border px-2 py-1 text-xs"
-                                                                                onClick={() => {
-                                                                                    setEditingDate(reading.date);
-                                                                                    setTableTemperature(
-                                                                                        String(reading.temperature ?? '')
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                Edit
-                                                                            </button>
-
-                                                                            <button
-                                                                                type="button"
-                                                                                className="rounded border px-2 py-1 text-xs"
-                                                                                onClick={() => {
-                                                                                    if (!reading.id) return;
-
-                                                                                    if (!confirm('Delete this BBT reading?')) return;
-
-                                                                                    router.delete(`/bbt/${reading.id}${ownerQuery}`, {
-                                                                                        preserveScroll: true,
-                                                                                        onSuccess: resetInlineEdit,
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                Delete
-                                                                            </button>
-                                                                        </>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="rounded bg-blue-500 px-2 py-1 text-xs text-white"
+                                                                            onClick={() => saveReading(reading)}
+                                                                        >
+                                                                            Add
+                                                                        </button>
                                                                     )}
                                                                 </div>
                                                             </td>
@@ -534,22 +840,10 @@ export default function Bbt({
                                             })}
                                         </tbody>
                                     </table>
-
-                                    {errors?.temperature && (
-                                        <div className="mt-2 text-sm text-red-500">
-                                            {errors.temperature}
-                                        </div>
-                                    )}
-
-                                    {errors?.date && (
-                                        <div className="mt-2 text-sm text-red-500">
-                                            {errors.date}
-                                        </div>
-                                    )}
                                 </div>
                             ) : (
                                 <div className="text-sm text-muted-foreground">
-                                    No BBT readings in this cycle range.
+                                    No selected timeline.
                                 </div>
                             )}
                         </div>
@@ -558,4 +852,5 @@ export default function Bbt({
             </div>
         </AppLayout>
     );
+
 }

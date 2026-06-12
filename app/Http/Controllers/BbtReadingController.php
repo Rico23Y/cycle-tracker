@@ -26,6 +26,8 @@ class BbtReadingController extends Controller
         if (!$permissions['can_view_bbt']) {
             return Inertia::render('bbt/index', [
                 'timelines' => [],
+                'readings' => [],
+                'cycleCount' => $cycles->count(),
                 'bbtLocked' => true,
             ]);
         }
@@ -46,6 +48,8 @@ class BbtReadingController extends Controller
 
         return Inertia::render('bbt/index', [
             'timelines' => $timelines,
+            'readings' => $bbtReadings,
+            'cycleCount' => $cycles->count(),
             'bbtLocked' => false,
         ]);
     }

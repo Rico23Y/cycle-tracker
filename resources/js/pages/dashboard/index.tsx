@@ -55,6 +55,9 @@ type Props = {
     readings: BbtReading[];
     nextPeriod: NextPeriod | null;
 
+    cycleCount?: number;
+    canEditCycles?: boolean;
+
     bbtLocked?: boolean;
     predictionsLocked?: boolean;
     canEditBbt?: boolean;
@@ -82,6 +85,8 @@ type DataAccess = {
 export default function Dashboard({
     readings,
     nextPeriod,
+    cycleCount = 0,
+    canEditCycles = true,
     bbtLocked = false,
     predictionsLocked = false,
     canEditBbt = true,
@@ -132,6 +137,24 @@ export default function Dashboard({
         date: new Date().toISOString().slice(0, 10),
     });
 
+    const cycleForm = useForm({
+        start_date: new Date().toISOString().slice(0, 10),
+        period_length: '',
+    });
+
+    function submitCycle(e: React.FormEvent) {
+        e.preventDefault();
+
+        if (!canEditCycles) return;
+
+        cycleForm.post(`/cycles${ownerQuery}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                cycleForm.reset('period_length');
+            },
+        });
+    }
+
     function submit(e: React.FormEvent) {
         e.preventDefault();
 
@@ -149,6 +172,90 @@ export default function Dashboard({
             date: r.date,
             temp: Number(r.temperature),
         }));
+
+    if (cycleCount === 0) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Dashboard" />
+
+                <div className="p-4">
+                    <form
+                        onSubmit={submitCycle}
+                        className="mx-auto max-w-xl rounded-xl border p-6 space-y-4"
+                    >
+                        <div>
+                            <h1 className="text-xl font-semibold">
+                                Start tracking your cycle
+                            </h1>
+
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Add your first Day One to begin. Period length and BBT can be added later.
+                            </p>
+                        </div>
+
+                        {canEditCycles ? (
+                            <>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Day One
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            value={cycleForm.data.start_date}
+                                            onChange={(e) => cycleForm.setData('start_date', e.target.value)}
+                                            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                                        />
+
+                                        {cycleForm.errors.start_date && (
+                                            <div className="mt-1 text-sm text-red-500">
+                                                {cycleForm.errors.start_date}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Period length optional
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="15"
+                                            value={cycleForm.data.period_length}
+                                            onChange={(e) => cycleForm.setData('period_length', e.target.value)}
+                                            placeholder="Example: 5"
+                                            className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                                        />
+
+                                        {cycleForm.errors.period_length && (
+                                            <div className="mt-1 text-sm text-red-500">
+                                                {cycleForm.errors.period_length}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={cycleForm.processing}
+                                    className="rounded bg-blue-500 px-4 py-2 text-sm text-white disabled:opacity-50"
+                                >
+                                    {cycleForm.processing ? 'Saving...' : 'Add Day One'}
+                                </button>
+                            </>
+                        ) : (
+                            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                Cycle editing is locked by the owner.
+                            </div>
+                        )}
+                    </form>
+                </div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
