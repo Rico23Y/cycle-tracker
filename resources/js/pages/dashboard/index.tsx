@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import { DayPicker } from 'react-day-picker';
@@ -49,15 +49,60 @@ type NextPeriod = {
     average_cycle_length: number;
 
     pregnancy_test_date: string;
-
 };
 
 type Props = {
     readings: BbtReading[];
     nextPeriod: NextPeriod | null;
+
+    bbtLocked?: boolean;
+    predictionsLocked?: boolean;
+    canEditBbt?: boolean;
 };
 
-export default function Dashboard({ readings, nextPeriod }: Props) {
+type DataAccess = {
+    owner_key: string;
+    owner_label: string;
+    is_self: boolean;
+    permissions: {
+        can_view_cycles: boolean;
+        can_edit_cycles: boolean;
+
+        can_view_bbt: boolean;
+        can_edit_bbt: boolean;
+
+        can_view_symptoms: boolean;
+        can_edit_symptoms: boolean;
+
+        can_view_predictions: boolean;
+        can_view_insights: boolean;
+    };
+};
+
+export default function Dashboard({
+    readings,
+    nextPeriod,
+    bbtLocked = false,
+    predictionsLocked = false,
+    canEditBbt = true,
+}: Props) {
+    const { dataAccess } = usePage().props as {
+        dataAccess?: DataAccess;
+    };
+
+    const permissions = dataAccess?.permissions;
+
+    const canViewBbt = !bbtLocked && (permissions?.can_view_bbt ?? true);
+    const canLogBbt = canViewBbt && canEditBbt && (permissions?.can_edit_bbt ?? true);
+
+    const canViewPredictions =
+        !predictionsLocked &&
+        (permissions?.can_view_predictions ?? true);
+
+    const ownerQuery =
+        dataAccess?.owner_key && dataAccess.owner_key !== 'me'
+            ? `?owner=${encodeURIComponent(dataAccess.owner_key)}`
+            : '';
 
     const chartRef = useRef<HTMLDivElement | null>(null);
 
@@ -89,7 +134,10 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post('/bbt', {
+
+        if (!canLogBbt) return;
+
+        post(`/bbt${ownerQuery}`, {
             onSuccess: () => reset('temperature'),
         });
     }
@@ -107,86 +155,133 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
             <Head title="Dashboard" />
 
             <div className="grid gap-4 p-4">
+                <div>
+                    <h1 className="text-xl font-semibold">
+                        Dashboard
+                    </h1>
 
-                {/* 1st tile */}
+                    <p className="text-sm text-muted-foreground">
+                        Viewing {dataAccess?.owner_label ?? 'My Data'}.
+                    </p>
+                </div>
+
+                {/* BBT TILE */}
                 <div className="rounded-xl border p-4 space-y-4">
+                    <div>
+                        <h3 className="text-sm font-semibold">
+                            Temperature Trend
+                        </h3>
 
-                    {/* 📈 Graph */}
-                    <div ref={chartRef} className="h-[240px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData}>
-                                <XAxis 
-                                    dataKey="date" 
-                                    tickFormatter={(tickItem) => {
-                                        const date = new Date(tickItem);
-                                        const month = date.toLocaleString('default', { month: 'short' });
-                                        const day = date.getDate();
-                                        return `${month}-${day}`;
-                                    }}
-                                />
-
-                                <YAxis 
-                                    domain={[
-                                        (dataMin) => Math.floor((dataMin - 0.2) * 100) / 100, 
-                                        (dataMax) => Math.ceil((dataMax + 0.2) * 100) / 100
-                                    ]} 
-                                    tickFormatter={(value: number) => value.toFixed(2)}
-                                />
-
-                                <Tooltip />
-                                <Line type="monotone" dataKey="temp" />
-                            </LineChart>
-                        </ResponsiveContainer>
+                        <p className="text-xs text-muted-foreground">
+                            Basal body temperature records
+                        </p>
                     </div>
 
-                    {/* 📝 Quick Log Form */}
-                    <form onSubmit={submit} className="flex gap-2">
-                        <input
-                            type="date"
-                            value={data.date}
-                            onChange={e => setData('date', e.target.value)}
-                            className="border rounded px-2"
-                        />
+                    {!canViewBbt ? (
+                        <div className="rounded-lg bg-gray-100 p-4 text-sm text-muted-foreground">
+                            🔒 BBT is locked by the owner.
+                        </div>
+                    ) : (
+                        <>
+                            <div ref={chartRef} className="h-[240px]">
+                                {chartData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={chartData}>
+                                            <XAxis
+                                                dataKey="date"
+                                                tickFormatter={(tickItem) => {
+                                                    const date = new Date(tickItem + 'T00:00:00');
+                                                    const month = date.toLocaleString('default', {
+                                                        month: 'short',
+                                                    });
+                                                    const day = date.getDate();
 
-                        <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Temp"
-                            value={data.temperature}
-                            onChange={e => setData('temperature', e.target.value)}
-                            className="border rounded px-2"
-                        />
+                                                    return `${month}-${day}`;
+                                                }}
+                                            />
 
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="bg-blue-500 text-white px-3 rounded disabled:opacity-50"
-                        >
-                            {processing ? 'Saving...' : 'Add'}
-                        </button>
-                    </form>
+                                            <YAxis
+                                                domain={[
+                                                    (dataMin: number) =>
+                                                        Math.floor((dataMin - 0.2) * 100) / 100,
+                                                    (dataMax: number) =>
+                                                        Math.ceil((dataMax + 0.2) * 100) / 100,
+                                                ]}
+                                                tickFormatter={(value: number) => value.toFixed(2)}
+                                            />
 
-                    <h3 className="text-sm font-semibold">
-                        Temperature Trend
-                    </h3>
+                                            <Tooltip
+                                                formatter={(value) => [
+                                                    `${Number(value).toFixed(2)}°C`,
+                                                    'Temperature',
+                                                ]}
+                                            />
 
-                    <p className="text-xs text-muted-foreground">
-                        Showing last {chartData.length} readings
-                    </p>
+                                            <Line
+                                                type="monotone"
+                                                dataKey="temp"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                        No BBT readings yet.
+                                    </div>
+                                )}
+                            </div>
 
+                            {canLogBbt ? (
+                                <form onSubmit={submit} className="flex flex-wrap gap-2">
+                                    <input
+                                        type="date"
+                                        value={data.date}
+                                        onChange={e => setData('date', e.target.value)}
+                                        className="rounded border px-2 py-1 text-sm"
+                                    />
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="Temp"
+                                        value={data.temperature}
+                                        onChange={e => setData('temperature', e.target.value)}
+                                        className="rounded border px-2 py-1 text-sm"
+                                    />
+
+                                    <button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="rounded bg-blue-500 px-3 py-1 text-sm text-white disabled:opacity-50"
+                                    >
+                                        {processing ? 'Saving...' : 'Add'}
+                                    </button>
+                                </form>
+                            ) : (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    You can view BBT records, but editing is locked by the owner.
+                                </div>
+                            )}
+
+                            <p className="text-xs text-muted-foreground">
+                                Showing last {chartData.length} readings
+                            </p>
+                        </>
+                    )}
                 </div>
-                
 
-                {/* Lower tiles */}
+                {/* LOWER TILES */}
                 <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2 xl:grid-cols-3">
-
-                    {/* 2nd tile: Next Period */}
-                    <div className="min-h-[220px] rounded-xl border p-4 flex flex-col justify-center">
-                        <h3 className="text-sm font-semibold mb-4">
+                    {/* NEXT PERIOD */}
+                    <div className="flex min-h-[220px] flex-col justify-center rounded-xl border p-4">
+                        <h3 className="mb-4 text-sm font-semibold">
                             Next Period
                         </h3>
 
-                        {nextPeriod ? (
+                        {!canViewPredictions ? (
+                            <div className="text-sm text-muted-foreground">
+                                🔒 Predictions are locked by the owner.
+                            </div>
+                        ) : nextPeriod ? (
                             <>
                                 <div className="text-4xl font-bold">
                                     {nextPeriod.days_left >= 0
@@ -220,13 +315,17 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                         )}
                     </div>
 
-                    {/* 3rd tile: Ovulation Window */}
-                    <div className="min-h-[220px] rounded-xl border p-4 flex flex-col justify-center">
-                        <h3 className="text-sm font-semibold mb-4">
+                    {/* OVULATION */}
+                    <div className="flex min-h-[220px] flex-col justify-center rounded-xl border p-4">
+                        <h3 className="mb-4 text-sm font-semibold">
                             Ovulation Window
                         </h3>
 
-                        {nextPeriod ? (
+                        {!canViewPredictions ? (
+                            <div className="text-sm text-muted-foreground">
+                                🔒 Predictions are locked by the owner.
+                            </div>
+                        ) : nextPeriod ? (
                             <>
                                 <div className="text-4xl font-bold">
                                     {nextPeriod.ovulation_days_left >= 0
@@ -273,13 +372,17 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                         )}
                     </div>
 
-                    {/* 4th tile: Small Calendar */}
+                    {/* SMALL CALENDAR */}
                     <div className="min-h-[220px] rounded-xl border p-4">
-                        <h3 className="text-sm font-semibold mb-4">
+                        <h3 className="mb-4 text-sm font-semibold">
                             Cycle Calendar
                         </h3>
 
-                        {nextPeriod && (
+                        {!canViewPredictions ? (
+                            <div className="text-sm text-muted-foreground">
+                                🔒 Calendar predictions are locked by the owner.
+                            </div>
+                        ) : nextPeriod ? (
                             <DayPicker
                                 disableNavigation
                                 hideNavigation
@@ -340,11 +443,13 @@ export default function Dashboard({ readings, nextPeriod }: Props) {
                                     preSafeDay: 'bg-green-100 text-black rounded-full',
                                 }}
                             />
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No calendar prediction available
+                            </div>
                         )}
                     </div>
-
                 </div>
-
             </div>
         </AppLayout>
     );
