@@ -6,6 +6,8 @@ use App\Models\Insight;
 use App\Http\Requests\StoreInsightRequest;
 use App\Http\Requests\UpdateInsightRequest;
 use App\Services\InsightService;
+use App\Services\DataAccessContextService;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InsightController extends Controller
@@ -13,11 +15,34 @@ class InsightController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(InsightService $insightService)
-    {
-        $user = auth()->user();
+    public function index(
+        Request $request,
+        InsightService $insightService,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
 
-        $cycles = $user->cycles()
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        if (
+            !$permissions['can_view_insights'] ||
+            !$permissions['can_view_cycles']
+        ) {
+            return Inertia::render('insights/index', [
+                'insights' => [
+                    'ranges' => [],
+                ],
+                'insightsLocked' => true,
+                'lockReason' => !$permissions['can_view_insights']
+                    ? 'The owner has not allowed access to insights.'
+                    : 'Insights require access to cycle records.',
+            ]);
+        }
+
+        $cycles = $owner->cycles()
             ->orderBy('start_date')
             ->get();
 
@@ -26,6 +51,8 @@ class InsightController extends Controller
 
         return Inertia::render('insights/index', [
             'insights' => $insights,
+            'insightsLocked' => false,
+            'lockReason' => null,
         ]);
     }
 
