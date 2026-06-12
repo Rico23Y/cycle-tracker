@@ -6,22 +6,38 @@ use App\Models\Cycle;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Services\CycleTimelineService;
+use App\Services\DataAccessContextService;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
 class CycleController extends Controller
 {
-    public function index(CycleTimelineService $timelineService)
-    {
-        $user = auth()->user();
+    public function index(
+        Request $request,
+        CycleTimelineService $timelineService,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
 
-        $cycles = $user->cycles()
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        if (!$permissions['can_view_cycles']) {
+            return Inertia::render('cycles/index', [
+                'timelines' => [],
+                'cycleLocked' => true,
+            ]);
+        }
+
+        $cycles = $owner->cycles()
             ->orderBy('start_date')
             ->get();
 
-        $symptoms = $user->symptoms()
-            ->orderBy('date')
-            ->get();
+        $symptoms = $permissions['can_view_symptoms']
+            ? $owner->symptoms()->orderBy('date')->get()
+            : collect();
 
         $timelines = $timelineService
             ->buildTimelines(
@@ -31,6 +47,7 @@ class CycleController extends Controller
 
         return Inertia::render('cycles/index', [
             'timelines' => $timelines,
+            'cycleLocked' => false,
         ]);
     }
 
@@ -44,14 +61,25 @@ class CycleController extends Controller
      *
      * Used when converting predicted Day One into an actual period.
      */
-    public function store(Request $request)
-    {
+    public function store(
+        Request $request,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_cycles'], 403);
+
         $validated = $request->validate([
             'start_date' => [
                 'required',
                 'date',
                 Rule::unique('cycles', 'start_date')
-                    ->where('user_id', auth()->id()),
+                    ->where('user_id', $owner->id),
             ],
             'period_length' => [
                 'nullable',
@@ -64,7 +92,7 @@ class CycleController extends Controller
         ]);
 
         Cycle::create([
-            'user_id' => auth()->id(),
+            'user_id' => $owner->id,
             'created_by_user_id' => auth()->id(),
             'updated_by_user_id' => auth()->id(),
             'start_date' => $validated['start_date'],
@@ -91,16 +119,27 @@ class CycleController extends Controller
      * - moving Day One
      * - updating period end / period_length
      */
-    public function update(Request $request, Cycle $cycle)
-    {
-        abort_unless($cycle->user_id === auth()->id(), 403);
+    public function update(
+        Request $request,
+        Cycle $cycle,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_cycles'], 403);
+        abort_unless($cycle->user_id === $owner->id, 403);
 
         $validated = $request->validate([
             'start_date' => [
                 'nullable',
                 'date',
                 Rule::unique('cycles', 'start_date')
-                    ->where('user_id', auth()->id())
+                    ->where('user_id', $owner->id)
                     ->ignore($cycle->id),
             ],
             'period_end_date' => [
@@ -143,8 +182,6 @@ class CycleController extends Controller
             return back();
         }
 
-        
-
         /*
         |--------------------------------------------------------------------------
         | Update Period Length
@@ -177,12 +214,22 @@ class CycleController extends Controller
         return back();
     }
 
-    public function destroy(Cycle $cycle)
-    {
-        abort_unless($cycle->user_id === auth()->id(), 403);
+    public function destroy(
+        Request $request,
+        Cycle $cycle,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
 
-        $latestCycle = auth()->user()
-            ->cycles()
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_cycles'], 403);
+        abort_unless($cycle->user_id === $owner->id, 403);
+
+        $latestCycle = $owner->cycles()
             ->orderBy('start_date', 'desc')
             ->first();
 

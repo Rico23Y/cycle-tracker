@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Symptom;
+use App\Services\DataAccessContextService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,8 +14,19 @@ class SymptomController extends Controller
         return Inertia::render('symptoms/index');
     }
 
-    public function store(Request $request)
-    {
+    public function store(
+        Request $request,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_symptoms'], 403);
+
         $validated = $request->validate([
             'date' => [
                 'required',
@@ -38,21 +50,33 @@ class SymptomController extends Controller
             ],
         ]);
 
-        auth()->user()->symptoms()->create([
+        Symptom::create([
+            'user_id' => $owner->id,
+            'created_by_user_id' => auth()->id(),
+            'updated_by_user_id' => auth()->id(),
             'date' => $validated['date'],
             'type' => $validated['type'],
             'level' => $validated['level'],
             'notes' => $validated['notes'] ?? null,
-            'created_by_user_id' => auth()->id(),
-            'updated_by_user_id' => auth()->id(),
         ]);
 
         return back();
     }
 
-    public function update(Request $request, Symptom $symptom)
-    {
-        abort_unless($symptom->user_id === auth()->id(), 403);
+    public function update(
+        Request $request,
+        Symptom $symptom,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_symptoms'], 403);
+        abort_unless($symptom->user_id === $owner->id, 403);
 
         $validated = $request->validate([
             'type' => [
@@ -83,9 +107,20 @@ class SymptomController extends Controller
         return back();
     }
 
-    public function destroy(Symptom $symptom)
-    {
-        abort_unless($symptom->user_id === auth()->id(), 403);
+    public function destroy(
+        Request $request,
+        Symptom $symptom,
+        DataAccessContextService $dataAccessContextService
+    ) {
+        $context = $dataAccessContextService->resolve(
+            $request->query('owner')
+        );
+
+        $owner = $context['owner'];
+        $permissions = $context['permissions'];
+
+        abort_unless($permissions['can_edit_symptoms'], 403);
+        abort_unless($symptom->user_id === $owner->id, 403);
 
         $symptom->delete();
 
