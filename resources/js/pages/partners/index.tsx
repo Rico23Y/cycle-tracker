@@ -70,7 +70,7 @@ type PartnerForm = {
 const defaultForm: PartnerForm = {
     name: '',
     email: '',
-    status: 'active',
+    status: 'pending',
 
     can_view_cycles: true,
     can_edit_cycles: false,
@@ -143,12 +143,41 @@ export default function Partners({
 
     const [form, setForm] = useState<PartnerForm>(defaultForm);
 
-    const { errors, dataAccess } = usePage().props as {
+    const { errors } = usePage().props as {
         errors?: Record<string, string>;
-        dataAccess?: unknown;
     };
 
-console.log(dataAccess);
+    const pendingShares = sharedWithMe.filter(
+        (share) => share.status === 'pending'
+    );
+
+    const activeShares = sharedWithMe.filter(
+        (share) => share.status === 'active'
+    );
+
+    const inactiveShares = sharedWithMe.filter(
+        (share) => !['pending', 'active'].includes(share.status)
+    );
+
+    function acceptShare(share: Partner) {
+        router.post(
+            `/partners/${share.id}/accept`,
+            {},
+            {
+                preserveScroll: true,
+            }
+        );
+    }
+
+    function declineShare(share: Partner) {
+        router.post(
+            `/partners/${share.id}/decline`,
+            {},
+            {
+                preserveScroll: true,
+            }
+        );
+    }
 
     function resetForm() {
         setMode(null);
@@ -260,7 +289,7 @@ console.log(dataAccess);
                         onClick={startAdd}
                         className="rounded bg-blue-500 px-4 py-2 text-sm text-white"
                     >
-                        Add Partner
+                        Send Request
                     </button>
                 </div>
 
@@ -271,11 +300,13 @@ console.log(dataAccess);
                     >
                         <div>
                             <h2 className="font-semibold">
-                                {mode === 'add' ? 'Add Partner' : 'Edit Partner'}
+                                {mode === 'add' ? 'Send Partner Request' : 'Edit Partner'}
                             </h2>
 
                             <p className="text-sm text-muted-foreground">
-                                If view access is disabled, edit access is also disabled.
+                                {mode === 'add'
+                                    ? 'This will send a pending sharing request. The partner must accept before they can access your data.'
+                                    : 'If view access is disabled, edit access is also disabled.'}
                             </p>
                         </div>
 
@@ -331,44 +362,46 @@ console.log(dataAccess);
                             </div>
                         </div>
 
-                        <div>
-                            <label className="text-sm font-medium">
-                                Status
-                            </label>
+                        {mode === 'edit' && (
+                            <div>
+                                <label className="text-sm font-medium">
+                                    Status
+                                </label>
 
-                            <select
-                                value={form.status}
-                                onChange={(e) => {
-                                    setForm({
-                                        ...form,
-                                        status: e.target.value as PartnerStatus,
-                                    });
-                                }}
-                                className="mt-1 w-full rounded border px-3 py-2 text-sm"
-                            >
-                                <option value="active">
-                                    Active
-                                </option>
+                                <select
+                                    value={form.status}
+                                    onChange={(e) => {
+                                        setForm({
+                                            ...form,
+                                            status: e.target.value as PartnerStatus,
+                                        });
+                                    }}
+                                    className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                                >
+                                    <option value="active">
+                                        Active
+                                    </option>
 
-                                <option value="pending">
-                                    Pending
-                                </option>
+                                    <option value="pending">
+                                        Pending
+                                    </option>
 
-                                <option value="paused">
-                                    Paused
-                                </option>
+                                    <option value="paused">
+                                        Paused
+                                    </option>
 
-                                <option value="declined">
-                                    Declined
-                                </option>
-                            </select>
+                                    <option value="declined">
+                                        Declined
+                                    </option>
+                                </select>
 
-                            {errors?.status && (
-                                <div className="mt-1 text-sm text-red-500">
-                                    {errors.status}
-                                </div>
-                            )}
-                        </div>
+                                {errors?.status && (
+                                    <div className="mt-1 text-sm text-red-500">
+                                        {errors.status}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-3">
                             <div>
@@ -638,27 +671,47 @@ console.log(dataAccess);
 
                 <div className="rounded-xl border p-4 space-y-4">
                     <h2 className="font-semibold">
-                        People Sharing With Me
+                        Pending Invitations
                     </h2>
 
-                    {sharedWithMe.length > 0 ? (
+                    {pendingShares.length > 0 ? (
                         <div className="grid gap-3">
-                            {sharedWithMe.map((share) => (
+                            {pendingShares.map((share) => (
                                 <div
                                     key={share.id}
                                     className="rounded-lg border p-4 space-y-3"
                                 >
-                                    <div>
-                                        <div className="font-medium">
-                                            {share.owner?.name ?? 'Unknown owner'}
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div className="font-medium">
+                                                {share.owner?.name ?? 'Unknown owner'}
+                                            </div>
+
+                                            <div className="text-sm text-muted-foreground">
+                                                {share.owner?.email ?? 'No email'}
+                                            </div>
+
+                                            <div className="mt-1 text-xs text-blue-600">
+                                                This user wants to share cycle data with you.
+                                            </div>
                                         </div>
 
-                                        <div className="text-sm text-muted-foreground">
-                                            {share.owner?.email ?? 'No email'}
-                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => acceptShare(share)}
+                                                className="rounded bg-green-600 px-3 py-1 text-xs text-white"
+                                            >
+                                                Accept
+                                            </button>
 
-                                        <div className="mt-1 text-xs">
-                                            This user shared cycle data with you.
+                                            <button
+                                                type="button"
+                                                onClick={() => declineShare(share)}
+                                                className="rounded border px-3 py-1 text-xs"
+                                            >
+                                                Decline
+                                            </button>
                                         </div>
                                     </div>
 
@@ -714,10 +767,145 @@ console.log(dataAccess);
                         </div>
                     ) : (
                         <div className="text-sm text-muted-foreground">
-                            No one is sharing cycle data with you yet.
+                            No pending invitations.
                         </div>
                     )}
                 </div>
+
+                <div className="rounded-xl border p-4 space-y-4">
+                    <h2 className="font-semibold">
+                        Active Shares With Me
+                    </h2>
+
+                    {activeShares.length > 0 ? (
+                        <div className="grid gap-3">
+                            {activeShares.map((share) => (
+                                <div
+                                    key={share.id}
+                                    className="rounded-lg border p-4 space-y-3"
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div className="font-medium">
+                                                {share.owner?.name ?? 'Unknown owner'}
+                                            </div>
+
+                                            <div className="text-sm text-muted-foreground">
+                                                {share.owner?.email ?? 'No email'}
+                                            </div>
+
+                                            <div className="mt-1 text-xs text-green-600">
+                                                This share is active and appears in your data owner switcher.
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!confirm('Decline this share? You will lose access to this owner’s data.')) return;
+
+                                                declineShare(share);
+                                            }}
+                                            className="rounded border px-3 py-1 text-xs"
+                                        >
+                                            Decline
+                                        </button>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {permissionGroups.map((permission) => {
+                                            const canView = share[permission.viewKey];
+                                            const canEdit = share[permission.editKey];
+
+                                            return (
+                                                <span
+                                                    key={permission.viewKey}
+                                                    className={`
+                                                        rounded-full
+                                                        border
+                                                        px-2
+                                                        py-1
+                                                        text-xs
+                                                        ${canView
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-500'}
+                                                    `}
+                                                >
+                                                    {permission.label}: {canView ? 'View' : 'Locked'}
+                                                    {canView && canEdit ? ' + Edit' : ''}
+                                                </span>
+                                            );
+                                        })}
+
+                                        {viewOnlyPermissions.map((permission) => {
+                                            const allowed = share[permission.key];
+
+                                            return (
+                                                <span
+                                                    key={permission.key}
+                                                    className={`
+                                                        rounded-full
+                                                        border
+                                                        px-2
+                                                        py-1
+                                                        text-xs
+                                                        ${allowed
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-500'}
+                                                    `}
+                                                >
+                                                    {permission.label}: {allowed ? 'View' : 'Locked'}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-sm text-muted-foreground">
+                            No active shares yet.
+                        </div>
+                    )}
+                </div>
+
+                {inactiveShares.length > 0 && (
+                    <div className="rounded-xl border p-4 space-y-4">
+                        <h2 className="font-semibold">
+                            Inactive Shares
+                        </h2>
+
+                        <div className="grid gap-3">
+                            {inactiveShares.map((share) => (
+                                <div
+                                    key={share.id}
+                                    className="rounded-lg border p-4"
+                                >
+                                    <div className="font-medium">
+                                        {share.owner?.name ?? 'Unknown owner'}
+                                    </div>
+
+                                    <div className="text-sm text-muted-foreground">
+                                        {share.owner?.email ?? 'No email'}
+                                    </div>
+
+                                    <div className="mt-1 text-xs">
+                                        Status:{' '}
+                                        <span
+                                            className={
+                                                share.status === 'paused'
+                                                    ? 'text-orange-600'
+                                                    : 'text-red-600'
+                                            }
+                                        >
+                                            {share.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </AppLayout>
     );

@@ -20,7 +20,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('symptoms', SymptomController::class);
     Route::resource('cycles', CycleController::class);
     Route::resource('bbt', BbtReadingController::class);
+
+    Route::post('/partners/{partner}/accept', [PartnerController::class, 'accept'])
+        ->name('partners.accept');
+
+    Route::post('/partners/{partner}/decline', [PartnerController::class, 'decline'])
+        ->name('partners.decline');
     Route::resource('partners', PartnerController::class);
+
     Route::resource('insights', InsightController::class);
     
 });

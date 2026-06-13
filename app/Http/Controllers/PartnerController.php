@@ -21,7 +21,6 @@ class PartnerController extends Controller
         $sharedWithMe = auth()->user()
             ->sharedWithMe()
             ->with('owner:id,name,email')
-            ->where('status', 'active')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -31,87 +30,73 @@ class PartnerController extends Controller
         ]);
     }
 
+    public function create()
+    {
+        //
+    }
+
     public function store(Request $request)
     {
+        $owner = auth()->user();
+
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-            ],
+            'name' => ['required', 'string', 'max:255'],
             'email' => [
-                'nullable',
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('partners', 'email')
-                    ->where('owner_user_id', auth()->id()),
+                    ->where('owner_user_id', $owner->id),
             ],
 
-            'status' => [
-                'nullable',
-                'string',
-                'in:active,pending,paused,declined',
-            ],
+            'can_view_cycles' => ['nullable', 'boolean'],
+            'can_edit_cycles' => ['nullable', 'boolean'],
 
-            'can_view_cycles' => ['boolean'],
-            'can_edit_cycles' => ['boolean'],
+            'can_view_bbt' => ['nullable', 'boolean'],
+            'can_edit_bbt' => ['nullable', 'boolean'],
 
-            'can_view_bbt' => ['boolean'],
-            'can_edit_bbt' => ['boolean'],
+            'can_view_symptoms' => ['nullable', 'boolean'],
+            'can_edit_symptoms' => ['nullable', 'boolean'],
 
-            'can_view_symptoms' => ['boolean'],
-            'can_edit_symptoms' => ['boolean'],
-
-            'can_view_predictions' => ['boolean'],
-            'can_view_insights' => ['boolean'],
+            'can_view_predictions' => ['nullable', 'boolean'],
+            'can_view_insights' => ['nullable', 'boolean'],
         ]);
 
-        $partnerUser = null;
+        $partnerUser = User::query()
+            ->where('email', $validated['email'])
+            ->first();
 
-        if (!empty($validated['email'])) {
-            $partnerUser = User::where('email', $validated['email'])
-                ->first();
-
-            if ($partnerUser && $partnerUser->id === auth()->id()) {
-                return back()->withErrors([
-                    'email' => 'You cannot add yourself as a partner.',
-                ]);
-            }
+        if ($partnerUser && $partnerUser->id === $owner->id) {
+            return back()->withErrors([
+                'email' => 'You cannot share cycle data with yourself.',
+            ]);
         }
 
-        $canViewCycles = $validated['can_view_cycles'] ?? true;
-        $canViewBbt = $validated['can_view_bbt'] ?? false;
-        $canViewSymptoms = $validated['can_view_symptoms'] ?? false;
+        $permissions = $this->normalizePermissions($validated);
 
-        auth()->user()->partners()->create([
-            'owner_user_id' => auth()->id(),
+        $owner->partners()->create([
             'partner_user_id' => $partnerUser?->id,
 
             'name' => $validated['name'],
-            'email' => $validated['email'] ?? null,
+            'email' => $validated['email'],
 
-            'status' => $validated['status'] ?? 'active',
+            // New shares start as pending.
+            'status' => 'pending',
 
-            'can_view_cycles' => $canViewCycles,
-            'can_edit_cycles' => $canViewCycles
-                ? ($validated['can_edit_cycles'] ?? false)
-                : false,
-
-            'can_view_bbt' => $canViewBbt,
-            'can_edit_bbt' => $canViewBbt
-                ? ($validated['can_edit_bbt'] ?? false)
-                : false,
-
-            'can_view_symptoms' => $canViewSymptoms,
-            'can_edit_symptoms' => $canViewSymptoms
-                ? ($validated['can_edit_symptoms'] ?? false)
-                : false,
-
-            'can_view_predictions' => $validated['can_view_predictions'] ?? true,
-            'can_view_insights' => $validated['can_view_insights'] ?? false,
+            ...$permissions,
         ]);
 
         return back();
+    }
+
+    public function show(Partner $partner)
+    {
+        //
+    }
+
+    public function edit(Partner $partner)
+    {
+        //
     }
 
     public function update(Request $request, Partner $partner)
@@ -119,13 +104,10 @@ class PartnerController extends Controller
         abort_unless($partner->owner_user_id === auth()->id(), 403);
 
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-            ],
+            'name' => ['required', 'string', 'max:255'],
+
             'email' => [
-                'nullable',
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('partners', 'email')
@@ -133,67 +115,46 @@ class PartnerController extends Controller
                     ->ignore($partner->id),
             ],
 
-            'status' => [
-                'required',
-                'string',
-                'in:active,pending,paused,declined',
-            ],
+            'status' => ['required', Rule::in([
+                'pending',
+                'active',
+                'paused',
+                'declined',
+            ])],
 
-            'can_view_cycles' => ['boolean'],
-            'can_edit_cycles' => ['boolean'],
+            'can_view_cycles' => ['nullable', 'boolean'],
+            'can_edit_cycles' => ['nullable', 'boolean'],
 
-            'can_view_bbt' => ['boolean'],
-            'can_edit_bbt' => ['boolean'],
+            'can_view_bbt' => ['nullable', 'boolean'],
+            'can_edit_bbt' => ['nullable', 'boolean'],
 
-            'can_view_symptoms' => ['boolean'],
-            'can_edit_symptoms' => ['boolean'],
+            'can_view_symptoms' => ['nullable', 'boolean'],
+            'can_edit_symptoms' => ['nullable', 'boolean'],
 
-            'can_view_predictions' => ['boolean'],
-            'can_view_insights' => ['boolean'],
+            'can_view_predictions' => ['nullable', 'boolean'],
+            'can_view_insights' => ['nullable', 'boolean'],
         ]);
 
-        $partnerUser = null;
+        $partnerUser = User::query()
+            ->where('email', $validated['email'])
+            ->first();
 
-        if (!empty($validated['email'])) {
-            $partnerUser = User::where('email', $validated['email'])
-                ->first();
-
-            if ($partnerUser && $partnerUser->id === auth()->id()) {
-                return back()->withErrors([
-                    'email' => 'You cannot add yourself as a partner.',
-                ]);
-            }
+        if ($partnerUser && $partnerUser->id === auth()->id()) {
+            return back()->withErrors([
+                'email' => 'You cannot share cycle data with yourself.',
+            ]);
         }
 
-        $canViewCycles = $validated['can_view_cycles'] ?? false;
-        $canViewBbt = $validated['can_view_bbt'] ?? false;
-        $canViewSymptoms = $validated['can_view_symptoms'] ?? false;
+        $permissions = $this->normalizePermissions($validated);
 
         $partner->update([
             'partner_user_id' => $partnerUser?->id,
 
             'name' => $validated['name'],
-            'email' => $validated['email'] ?? null,
-
+            'email' => $validated['email'],
             'status' => $validated['status'],
 
-            'can_view_cycles' => $canViewCycles,
-            'can_edit_cycles' => $canViewCycles
-                ? ($validated['can_edit_cycles'] ?? false)
-                : false,
-
-            'can_view_bbt' => $canViewBbt,
-            'can_edit_bbt' => $canViewBbt
-                ? ($validated['can_edit_bbt'] ?? false)
-                : false,
-
-            'can_view_symptoms' => $canViewSymptoms,
-            'can_edit_symptoms' => $canViewSymptoms
-                ? ($validated['can_edit_symptoms'] ?? false)
-                : false,
-
-            'can_view_predictions' => $validated['can_view_predictions'] ?? false,
-            'can_view_insights' => $validated['can_view_insights'] ?? false,
+            ...$permissions,
         ]);
 
         return back();
@@ -206,5 +167,62 @@ class PartnerController extends Controller
         $partner->delete();
 
         return back();
+    }
+
+    public function accept(Partner $partner)
+    {
+        abort_unless($partner->partner_user_id === auth()->id(), 403);
+
+        if ($partner->status !== 'pending') {
+            return back();
+        }
+
+        $partner->update([
+            'status' => 'active',
+        ]);
+
+        return back();
+    }
+
+    public function decline(Partner $partner)
+    {
+        abort_unless($partner->partner_user_id === auth()->id(), 403);
+
+        if (!in_array($partner->status, ['pending', 'active'], true)) {
+            return back();
+        }
+
+        $partner->update([
+            'status' => 'declined',
+        ]);
+
+        return back();
+    }
+
+    private function normalizePermissions(array $validated): array
+    {
+        $canViewCycles = (bool) ($validated['can_view_cycles'] ?? false);
+        $canViewBbt = (bool) ($validated['can_view_bbt'] ?? false);
+        $canViewSymptoms = (bool) ($validated['can_view_symptoms'] ?? false);
+
+        return [
+            'can_view_cycles' => $canViewCycles,
+            'can_edit_cycles' => $canViewCycles
+                ? (bool) ($validated['can_edit_cycles'] ?? false)
+                : false,
+
+            'can_view_bbt' => $canViewBbt,
+            'can_edit_bbt' => $canViewBbt
+                ? (bool) ($validated['can_edit_bbt'] ?? false)
+                : false,
+
+            'can_view_symptoms' => $canViewSymptoms,
+            'can_edit_symptoms' => $canViewSymptoms
+                ? (bool) ($validated['can_edit_symptoms'] ?? false)
+                : false,
+
+            'can_view_predictions' => (bool) ($validated['can_view_predictions'] ?? false),
+            'can_view_insights' => (bool) ($validated['can_view_insights'] ?? false),
+        ];
     }
 }
