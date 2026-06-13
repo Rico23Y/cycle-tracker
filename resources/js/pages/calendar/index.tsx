@@ -53,6 +53,11 @@ type CalendarEvent = {
     symptom_type?: string;
     level?: number;
     notes?: string | null;
+
+    created_by_name?: string | null;
+    updated_by_name?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 };
 
 type CalendarData = {
@@ -214,6 +219,135 @@ export default function Calendar({
         setCustomSymptomType('');
         setSymptomLevel('1');
         setSymptomNotes('');
+    }
+
+    function formatRelativeTime(value?: string | null) {
+        if (!value) return null;
+
+        const date = new Date(value);
+        const now = new Date();
+
+        const diffSeconds = Math.floor(
+            (now.getTime() - date.getTime()) / 1000
+        );
+
+        if (diffSeconds < 10) {
+            return 'now';
+        }
+
+        if (diffSeconds < 60) {
+            return `${diffSeconds} seconds ago`;
+        }
+
+        const diffMinutes = Math.floor(diffSeconds / 60);
+
+        if (diffMinutes < 60) {
+            return diffMinutes === 1
+                ? '1 min ago'
+                : `${diffMinutes} mins ago`;
+        }
+
+        const diffHours = Math.floor(diffMinutes / 60);
+
+        if (diffHours < 24) {
+            return diffHours === 1
+                ? '1 hr ago'
+                : `${diffHours} hrs ago`;
+        }
+
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays < 7) {
+            return diffDays === 1
+                ? '1 day ago'
+                : `${diffDays} days ago`;
+        }
+
+        const diffWeeks = Math.floor(diffDays / 7);
+
+        if (diffWeeks < 4) {
+            return diffWeeks === 1
+                ? '1 week ago'
+                : `${diffWeeks} weeks ago`;
+        }
+
+        const diffMonths = Math.floor(diffDays / 30);
+
+        if (diffMonths < 12) {
+            return diffMonths <= 1
+                ? '1 month ago'
+                : `${diffMonths} months ago`;
+        }
+
+        const diffYears = Math.floor(diffDays / 365);
+
+        return diffYears <= 1
+            ? '1 year ago'
+            : `${diffYears} years ago`;
+    }
+
+    function formatFullDateTime(value?: string | null) {
+        if (!value) return '';
+
+        return new Date(value).toLocaleString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    }
+
+    function ActorInfo({ event }: { event: CalendarEvent }) {
+        if (
+            !event.created_by_name &&
+            !event.updated_by_name &&
+            !event.created_at &&
+            !event.updated_at
+        ) {
+            return null;
+        }
+
+        const createdRelative = formatRelativeTime(event.created_at);
+        const updatedRelative = formatRelativeTime(event.updated_at);
+
+        const sameActor =
+            event.created_by_name &&
+            event.updated_by_name &&
+            event.created_by_name === event.updated_by_name;
+
+        const sameTimestamp =
+            event.created_at &&
+            event.updated_at &&
+            event.created_at === event.updated_at;
+
+        return (
+            <div className="mt-2 rounded bg-white/30 px-2 py-1 text-xs space-y-0.5">
+                {event.created_by_name && (
+                    <div title={formatFullDateTime(event.created_at)}>
+                        Created by: {event.created_by_name}
+                        {createdRelative && ` · ${createdRelative}`}
+                    </div>
+                )}
+
+                {event.updated_by_name && !sameTimestamp && (
+                    <div title={formatFullDateTime(event.updated_at)}>
+                        Last edited by: {event.updated_by_name}
+                        {updatedRelative && ` · ${updatedRelative}`}
+                    </div>
+                )}
+
+                {!event.updated_by_name &&
+                    event.updated_at &&
+                    !sameTimestamp && (
+                        <div title={formatFullDateTime(event.updated_at)}>
+                            Last edited: {updatedRelative}
+                        </div>
+                    )}
+
+                {sameActor && !sameTimestamp && null}
+            </div>
+        );
     }
 
     if (cycleCount === 0) {
@@ -532,6 +666,10 @@ export default function Calendar({
                                                             </div>
                                                         )}
 
+                                                        {!event.locked && (
+                                                            <ActorInfo event={event} />
+                                                        )}
+
                                                         {!event.locked &&
                                                             event.type === 'day_one_actual_period' &&
                                                             event.cycle_id &&
@@ -733,6 +871,8 @@ export default function Calendar({
                                                             </div>
                                                         )}
 
+                                                        <ActorInfo event={symptom} />
+
                                                         {canEditSymptoms && (
                                                             <div className="mt-2 flex gap-2">
                                                                 <button
@@ -817,6 +957,8 @@ export default function Calendar({
                                                 <div>
                                                     Temperature: {Number(selectedBbt.temperature).toFixed(2)}°C
                                                 </div>
+
+                                                <ActorInfo event={selectedBbt} />
 
                                                 {canEditBbt && (
                                                     <div className="mt-2 flex gap-2">

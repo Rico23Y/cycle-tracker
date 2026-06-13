@@ -168,6 +168,10 @@ class CycleHistoryService
                         'editable' => $permissions['can_edit_cycles'],
                         'cycle_id' => $cycle->id,
                         'is_latest_cycle' => $isLatestCycle,
+                        'created_by_name' => $cycle->createdBy?->name,
+                        'updated_by_name' => $cycle->updatedBy?->name,
+                        'created_at' => $cycle->created_at?->toISOString(),
+                        'updated_at' => $cycle->updated_at?->toISOString(),                       
                     ]
                     : [
                         'type' => 'locked_cycles',
@@ -186,6 +190,10 @@ class CycleHistoryService
                             'editable' => $permissions['can_edit_cycles'],
                             'cycle_id' => $cycle->id,
                             'is_latest_cycle' => $isLatestCycle,
+                            'created_by_name' => $cycle->createdBy?->name,
+                            'updated_by_name' => $cycle->updatedBy?->name,
+                            'created_at' => $cycle->created_at?->toISOString(),
+                            'updated_at' => $cycle->updated_at?->toISOString(),
                         ];
                     }
                 }
@@ -486,6 +494,10 @@ class CycleHistoryService
                     'color' => 'gray',
                     'bbt_id' => $reading->id,
                     'temperature' => $reading->temperature,
+                    'created_by_name' => $reading->createdBy?->name,
+                    'updated_by_name' => $reading->updatedBy?->name,
+                    'created_at' => $reading->created_at?->toISOString(),
+                    'updated_at' => $reading->updated_at?->toISOString(),
                 ]
                 : [
                     'type' => 'locked_bbt',
@@ -518,6 +530,10 @@ class CycleHistoryService
                     'symptom_type' => $symptom->type,
                     'level' => $symptom->level,
                     'notes' => $symptom->notes,
+                    'created_by_name' => $symptom->createdBy?->name,
+                    'updated_by_name' => $symptom->updatedBy?->name,
+                    'created_at' => $symptom->created_at?->toISOString(),
+                    'updated_at' => $symptom->updated_at?->toISOString(),               
                 ]
                 : [
                     'type' => 'locked_symptom',

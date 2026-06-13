@@ -27,14 +27,26 @@ class CalendarController extends Controller
         $permissions = $context['permissions'];
 
         $cycles = $owner->cycles()
+            ->with([
+                'createdBy:id,name,email',
+                'updatedBy:id,name,email',
+            ])
             ->orderBy('start_date')
             ->get();
 
         $bbtReadings = $owner->bbtReadings()
+            ->with([
+                'createdBy:id,name,email',
+                'updatedBy:id,name,email',
+            ])
             ->orderBy('date')
             ->get();
 
         $symptoms = $owner->symptoms()
+            ->with([
+                'createdBy:id,name,email',
+                'updatedBy:id,name,email',
+            ])
             ->orderBy('date')
             ->get();
 
