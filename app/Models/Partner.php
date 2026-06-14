@@ -27,6 +27,8 @@ class Partner extends Model
 
         'can_view_predictions',
         'can_view_insights',
+
+        'requested_by_user_id',
     ];
 
     protected $casts = [
@@ -51,5 +53,10 @@ class Partner extends Model
     public function partnerUser()
     {
         return $this->belongsTo(User::class, 'partner_user_id');
+    }
+
+    public function requestedBy()
+    {
+        return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 }

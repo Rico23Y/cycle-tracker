@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Partner;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -14,13 +15,19 @@ class PartnerController extends Controller
     {
         $partners = auth()->user()
             ->partners()
-            ->with('partnerUser:id,name,email')
+            ->with([
+                'partnerUser:id,name,email',
+                'requestedBy:id,name,email',
+            ])
             ->orderBy('created_at', 'desc')
             ->get();
 
         $sharedWithMe = auth()->user()
             ->sharedWithMe()
-            ->with('owner:id,name,email')
+            ->with([
+                'owner:id,name,email',
+                'requestedBy:id,name,email',
+            ])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -37,17 +44,17 @@ class PartnerController extends Controller
 
     public function store(Request $request)
     {
-        $owner = auth()->user();
+        $requester = auth()->user();
 
         $validated = $request->validate([
+            'request_type' => ['required', Rule::in([
+                'share_mine',
+                'request_theirs',
+                'both',
+            ])],
+
             'name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('partners', 'email')
-                    ->where('owner_user_id', $owner->id),
-            ],
+            'email' => ['required', 'email', 'max:255'],
 
             'can_view_cycles' => ['nullable', 'boolean'],
             'can_edit_cycles' => ['nullable', 'boolean'],
@@ -62,29 +69,50 @@ class PartnerController extends Controller
             'can_view_insights' => ['nullable', 'boolean'],
         ]);
 
-        $partnerUser = User::query()
+        $targetUser = User::query()
             ->where('email', $validated['email'])
             ->first();
 
-        if ($partnerUser && $partnerUser->id === $owner->id) {
+        if ($targetUser && $targetUser->id === $requester->id) {
             return back()->withErrors([
-                'email' => 'You cannot share cycle data with yourself.',
+                'email' => 'You cannot create a sharing request with yourself.',
+            ]);
+        }
+
+        if (
+            in_array($validated['request_type'], ['request_theirs', 'both'], true) &&
+            !$targetUser
+        ) {
+            return back()->withErrors([
+                'email' => 'This user must have an account before you can request access to their data.',
             ]);
         }
 
         $permissions = $this->normalizePermissions($validated);
 
-        $owner->partners()->create([
-            'partner_user_id' => $partnerUser?->id,
+        DB::transaction(function () use ($validated, $requester, $targetUser, $permissions) {
+            if (in_array($validated['request_type'], ['share_mine', 'both'], true)) {
+                $this->createOrRenewPendingShare(
+                    owner: $requester,
+                    partnerUser: $targetUser,
+                    partnerName: $validated['name'],
+                    partnerEmail: $validated['email'],
+                    requestedBy: $requester,
+                    permissions: $permissions
+                );
+            }
 
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-
-            // New shares start as pending.
-            'status' => 'pending',
-
-            ...$permissions,
-        ]);
+            if (in_array($validated['request_type'], ['request_theirs', 'both'], true)) {
+                $this->createOrRenewPendingShare(
+                    owner: $targetUser,
+                    partnerUser: $requester,
+                    partnerName: $requester->name,
+                    partnerEmail: $requester->email,
+                    requestedBy: $requester,
+                    permissions: $permissions
+                );
+            }
+        });
 
         return back();
     }
@@ -162,7 +190,14 @@ class PartnerController extends Controller
 
     public function destroy(Partner $partner)
     {
-        abort_unless($partner->owner_user_id === auth()->id(), 403);
+        $userId = auth()->id();
+
+        abort_unless(
+            $partner->owner_user_id === $userId ||
+            $partner->partner_user_id === $userId ||
+            $partner->requested_by_user_id === $userId,
+            403
+        );
 
         $partner->delete();
 
@@ -171,7 +206,7 @@ class PartnerController extends Controller
 
     public function accept(Partner $partner)
     {
-        abort_unless($partner->partner_user_id === auth()->id(), 403);
+        abort_unless($this->canRespondToRequest($partner), 403);
 
         if ($partner->status !== 'pending') {
             return back();
@@ -186,7 +221,13 @@ class PartnerController extends Controller
 
     public function decline(Partner $partner)
     {
-        abort_unless($partner->partner_user_id === auth()->id(), 403);
+        $userId = auth()->id();
+
+        if ($partner->status === 'pending') {
+            abort_unless($this->canRespondToRequest($partner), 403);
+        } else {
+            abort_unless($partner->partner_user_id === $userId, 403);
+        }
 
         if (!in_array($partner->status, ['pending', 'active'], true)) {
             return back();
@@ -197,6 +238,69 @@ class PartnerController extends Controller
         ]);
 
         return back();
+    }
+
+    private function createOrRenewPendingShare(
+        User $owner,
+        ?User $partnerUser,
+        string $partnerName,
+        string $partnerEmail,
+        User $requestedBy,
+        array $permissions
+    ): Partner {
+        $existing = Partner::query()
+            ->where('owner_user_id', $owner->id)
+            ->when(
+                $partnerUser,
+                fn ($query) => $query->where('partner_user_id', $partnerUser->id),
+                fn ($query) => $query->where('email', $partnerEmail)
+            )
+            ->first();
+
+        if ($existing) {
+            $existing->update([
+                'partner_user_id' => $partnerUser?->id,
+                'requested_by_user_id' => $requestedBy->id,
+
+                'name' => $partnerName,
+                'email' => $partnerEmail,
+
+                // Re-send request with updated permissions.
+                'status' => 'pending',
+
+                ...$permissions,
+            ]);
+
+            return $existing;
+        }
+
+        return Partner::create([
+            'owner_user_id' => $owner->id,
+            'partner_user_id' => $partnerUser?->id,
+            'requested_by_user_id' => $requestedBy->id,
+
+            'name' => $partnerName,
+            'email' => $partnerEmail,
+            'status' => 'pending',
+
+            ...$permissions,
+        ]);
+    }
+
+    private function canRespondToRequest(Partner $partner): bool
+    {
+        $userId = auth()->id();
+
+        if (!$partner->requested_by_user_id) {
+            return $partner->partner_user_id === $userId;
+        }
+
+        if ($partner->requested_by_user_id === $userId) {
+            return false;
+        }
+
+        return $partner->owner_user_id === $userId ||
+            $partner->partner_user_id === $userId;
     }
 
     private function normalizePermissions(array $validated): array

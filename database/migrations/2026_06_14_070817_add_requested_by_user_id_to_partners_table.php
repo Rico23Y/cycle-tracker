@@ -1,0 +1,27 @@
+<?php
+
+use App\Models\User;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('partners', function (Blueprint $table) {
+            $table->foreignIdFor(User::class, 'requested_by_user_id')
+                ->nullable()
+                ->after('partner_user_id')
+                ->constrained('users')
+                ->nullOnDelete();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('partners', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('requested_by_user_id');
+        });
+    }
+};
