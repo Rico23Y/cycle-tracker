@@ -8,7 +8,8 @@ use Illuminate\Support\Collection;
 class BbtTimelineService
 {
     public function __construct(
-        protected CyclePredictionService $predictionService
+        protected CyclePredictionService $predictionService,
+        protected BbtOvulationAnalysisService $bbtOvulationAnalysisService
     ) {}
 
     public function buildTimelines(
@@ -70,10 +71,8 @@ class BbtTimelineService
             |--------------------------------------------------------------------------
             | Latest actual-to-predicted range
             |--------------------------------------------------------------------------
-            | Normal predicted cycle range:
-            | latest actual Day One → day before predicted next Day One
-            |--------------------------------------------------------------------------
             */
+
             $timelines[] = $this->buildSingleTimeline(
                 cycleId: $latestCycle->id,
                 cycleStart: $latestStart,
@@ -87,10 +86,8 @@ class BbtTimelineService
             |--------------------------------------------------------------------------
             | Extra BBT range after predicted Day One
             |--------------------------------------------------------------------------
-            | If user has BBT readings after predicted Day One but has not logged
-            | the new actual Day One yet, show those readings as a separate range.
-            |--------------------------------------------------------------------------
             */
+
             $latestBbtDate = $bbtReadings
                 ->map(fn ($reading) => Carbon::parse($reading->date))
                 ->filter(fn ($date) => $date->gte($predictedNextStart))
@@ -122,6 +119,20 @@ class BbtTimelineService
         bool $isPredicted,
         ?string $labelSuffix = null
     ): array {
+        $cycleLength = $cycleStart->diffInDays($nextPeriodDate);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calendar-based ovulation estimate
+        |--------------------------------------------------------------------------
+        |
+        | This is the existing calendar/prediction approximation:
+        | ovulation is about 14 days before the next period.
+        |
+        */
+
+        $calendarOvulationDay = max(1, $cycleLength - 14);
+
         $readingsByDate = $bbtReadings
             ->filter(function ($reading) use ($cycleStart, $cycleEnd) {
                 $date = Carbon::parse($reading->date);
@@ -153,6 +164,11 @@ class BbtTimelineService
             ]);
         }
 
+        $analysis = $this->bbtOvulationAnalysisService->analyze(
+            readings: $readings,
+            calendarOvulationDay: $calendarOvulationDay
+        );
+
         return [
             'id' => $cycleId . '-' . $cycleStart->toDateString(),
             'cycle_id' => $cycleId,
@@ -172,9 +188,11 @@ class BbtTimelineService
             'cycle_end_date' => $cycleEnd->toDateString(),
             'next_period_date' => $nextPeriodDate->toDateString(),
 
-            'cycle_length' => $cycleStart->diffInDays($nextPeriodDate),
+            'cycle_length' => $cycleLength,
+            'calendar_ovulation_day' => $calendarOvulationDay,
 
             'readings' => $readings,
+            'analysis' => $analysis,
         ];
     }
 }

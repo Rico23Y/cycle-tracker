@@ -27,6 +27,28 @@ type BbtReading = {
     temperature: number | null;
 };
 
+type BbtAnalysis = {
+    usable: boolean;
+    status: 'usable' | 'not_usable';
+    reason: string | null;
+
+    cover_line: number | null;
+
+    calendar_ovulation_day: number | null;
+    bbt_ovulation_day: number | null;
+    shift_start_day: number | null;
+
+    rule_used: 'standard' | 'slow_rise' | 'fallback' | null;
+
+    ignored_dates: string[];
+    outlier_dates: string[];
+
+    valid_temp_count: number;
+    missing_temp_count: number;
+
+    confidence: 'high' | 'medium' | 'low' | 'none';
+};
+
 type BbtTimeline = {
     id: string;
     cycle_id: number;
@@ -36,6 +58,10 @@ type BbtTimeline = {
     cycle_end_date: string;
     next_period_date: string;
     cycle_length: number;
+
+    calendar_ovulation_day: number | null;
+    analysis: BbtAnalysis;
+
     readings: BbtReading[];
 };
 
@@ -124,6 +150,32 @@ export default function Bbt({
     const useSimpleBbtMode =
         timelines.length === 0 || !timeline;
 
+    const analysis = timeline?.analysis ?? null;
+
+    function formatRule(rule: BbtAnalysis['rule_used']) {
+        if (rule === 'standard') return 'Standard rise';
+        if (rule === 'slow_rise') return 'Slow rise';
+        if (rule === 'fallback') return 'Fall-back rise';
+
+        return '—';
+    }
+
+    function formatConfidence(confidence: BbtAnalysis['confidence']) {
+        if (confidence === 'high') return 'High';
+        if (confidence === 'medium') return 'Medium';
+        if (confidence === 'low') return 'Low';
+
+        return 'None';
+    }
+
+    function isOutlierDate(date: string) {
+        return analysis?.outlier_dates.includes(date) ?? false;
+    }
+
+    function isIgnoredDate(date: string) {
+        return analysis?.ignored_dates.includes(date) ?? false;
+    }        
+
     function resetInlineEdit() {
         setEditingDate(null);
         setTableTemperature('');
@@ -210,6 +262,101 @@ export default function Bbt({
             }
         );
     }
+
+
+    function BbtChartTooltip({
+        active,
+        payload,
+        label,
+    }: {
+        active?: boolean;
+        payload?: {
+            value: number;
+            payload: BbtReading;
+        }[];
+        label?: number;
+    }) {
+        if (!active || !payload || payload.length === 0) {
+            return null;
+        }
+
+        const reading = payload[0].payload;
+        const cycleDay = Number(label);
+
+        const isCalendarOvulation =
+            timeline?.calendar_ovulation_day === cycleDay;
+
+        const isBbtOvulation =
+            analysis?.usable &&
+            analysis.bbt_ovulation_day === cycleDay;
+
+        return (
+            <div className="rounded-lg border bg-background p-3 text-sm shadow">
+                <div className="font-medium">
+                    Cycle Day {cycleDay}
+                </div>
+
+                <div className="text-muted-foreground">
+                    {new Date(reading.date + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                    })}
+                </div>
+
+                <div className="mt-2">
+                    Temperature: {Number(reading.temperature).toFixed(2)}°C
+                </div>
+
+                {isOutlierDate(reading.date) && (
+                    <div className="mt-1 text-orange-600">
+                        This reading is marked as an outlier and ignored in BBT analysis.
+                    </div>
+                )}
+
+                {isIgnoredDate(reading.date) && !isOutlierDate(reading.date) && (
+                    <div className="mt-1 text-muted-foreground">
+                        This reading was ignored in BBT analysis.
+                    </div>
+                )}
+
+                {(isCalendarOvulation || isBbtOvulation) && (
+                    <div className="mt-3 space-y-2 border-t pt-2">
+                        {isCalendarOvulation && (
+                            <div>
+                                <div className="font-medium">
+                                    Calendar Ovulation
+                                </div>
+
+                                <div className="text-muted-foreground">
+                                    Estimated from the cycle length / calendar prediction.
+                                </div>
+                            </div>
+                        )}
+
+                        {isBbtOvulation && (
+                            <div>
+                                <div className="font-medium">
+                                    BBT Ovulation
+                                </div>
+
+                                <div className="text-muted-foreground">
+                                    Estimated from a confirmed BBT temperature shift.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {analysis?.usable && analysis.cover_line !== null && (
+                    <div className="mt-2 text-muted-foreground">
+                        Cover line: {analysis.cover_line.toFixed(1)}°C
+                    </div>
+                )}
+            </div>
+        );
+    }
+
 
     if (bbtLocked || !canViewBbt) {
         return (
@@ -634,10 +781,99 @@ export default function Bbt({
                                 </p>
                             </div>
 
+                            {analysis && (
+                                <div className="grid gap-3 md:grid-cols-4">
+                                    <div className="rounded-lg border p-3">
+                                        <div className="text-xs text-muted-foreground">
+                                            BBT Status
+                                        </div>
+
+                                        <div
+                                            className={
+                                                analysis.usable
+                                                    ? 'mt-1 font-semibold text-green-600'
+                                                    : 'mt-1 font-semibold text-orange-600'
+                                            }
+                                        >
+                                            {analysis.usable ? 'Usable' : 'Not usable'}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border p-3">
+                                        <div className="text-xs text-muted-foreground">
+                                            Confidence
+                                        </div>
+
+                                        <div className="mt-1 font-semibold">
+                                            {formatConfidence(analysis.confidence)}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border p-3">
+                                        <div className="text-xs text-muted-foreground">
+                                            Rule
+                                        </div>
+
+                                        <div className="mt-1 font-semibold">
+                                            {formatRule(analysis.rule_used)}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border p-3">
+                                        <div className="text-xs text-muted-foreground">
+                                            Cover Line
+                                        </div>
+
+                                        <div className="mt-1 font-semibold">
+                                            {analysis.cover_line !== null
+                                                ? `${analysis.cover_line.toFixed(1)}°C`
+                                                : '—'}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {analysis && !analysis.usable && (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    {analysis.reason}
+                                </div>
+                            )}
+
+                            {analysis && (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    <div>
+                                        Calendar ovulation estimate:{' '}
+                                        {analysis.calendar_ovulation_day
+                                            ? `Day ${analysis.calendar_ovulation_day}`
+                                            : '—'}
+                                    </div>
+
+                                    <div>
+                                        BBT-based ovulation:{' '}
+                                        {analysis.bbt_ovulation_day
+                                            ? `Day ${analysis.bbt_ovulation_day}`
+                                            : '—'}
+                                    </div>
+
+                                    <div>
+                                        Ignored / unusual readings:{' '}
+                                        {analysis.ignored_dates.length}
+                                    </div>
+                                </div>
+                            )}
+
                             {chartData.length > 0 ? (
-                                <div className="h-[320px]">
+                                <div className="h-[360px]">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={chartData}>
+                                        <LineChart
+                                            data={chartData}
+                                            margin={{
+                                                top: 48,
+                                                right: 24,
+                                                bottom: 32,
+                                                left: 12,
+                                            }}
+                                        >
                                             <XAxis
                                                 dataKey="cycle_day"
                                                 label={{
@@ -657,19 +893,39 @@ export default function Bbt({
                                                 tickFormatter={(value: number) => value.toFixed(2)}
                                             />
 
-                                            <Tooltip
-                                                labelFormatter={(cycleDay) => `Cycle Day ${cycleDay}`}
-                                                formatter={(value) => [
-                                                    `${Number(value).toFixed(2)}°C`,
-                                                    'Temperature',
-                                                ]}
-                                            />
+                                            <Tooltip content={<BbtChartTooltip />} />
 
-                                            {timeline && !timeline.is_predicted && (
+                                            {timeline?.calendar_ovulation_day && (
                                                 <ReferenceLine
-                                                    x={14}
+                                                    x={timeline.calendar_ovulation_day}
                                                     strokeDasharray="3 3"
-                                                    label="Approx. ovulation"
+                                                    label={{
+                                                        value: 'Calendar Ovulation',
+                                                        position: 'insideTop',
+                                                        dy: 12,
+                                                        fontSize: 12,
+                                                    }}
+                                                />
+                                            )}
+
+                                            {analysis?.usable && analysis.cover_line !== null && (
+                                                <ReferenceLine
+                                                    y={analysis.cover_line}
+                                                    strokeDasharray="4 4"
+                                                    label="Cover Line"
+                                                />
+                                            )}
+
+                                            {analysis?.usable && analysis.bbt_ovulation_day !== null && (
+                                                <ReferenceLine
+                                                    x={analysis.bbt_ovulation_day}
+                                                    strokeDasharray="4 4"
+                                                    label={{
+                                                        value: 'BBT Ovulation',
+                                                        position: 'insideTop',
+                                                        dy: 30,
+                                                        fontSize: 12,
+                                                    }}
                                                 />
                                             )}
 
@@ -745,6 +1001,18 @@ export default function Bbt({
                                                             {reading.id && !isEditing ? (
                                                                 <span>
                                                                     {Number(reading.temperature).toFixed(2)}°C
+
+                                                                    {isOutlierDate(reading.date) && (
+                                                                        <span className="ml-2 rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
+                                                                            outlier
+                                                                        </span>
+                                                                    )}
+
+                                                                    {isIgnoredDate(reading.date) && !isOutlierDate(reading.date) && (
+                                                                        <span className="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                                                                            ignored
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                             ) : canEditBbt && (isEditing || !reading.id) ? (
                                                                 <input
