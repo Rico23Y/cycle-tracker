@@ -29,4 +29,9 @@ class Symptom extends Model
     {
         return $this->belongsTo(User::class, 'updated_by_user_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
