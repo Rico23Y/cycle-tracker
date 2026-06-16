@@ -131,7 +131,7 @@ class BbtTimelineService
         |
         */
 
-        $calendarOvulationDay = max(1, $cycleLength - 14);
+        $calendarOvulationDay = max(1, $cycleLength - 13);
 
         $readingsByDate = $bbtReadings
             ->filter(function ($reading) use ($cycleStart, $cycleEnd) {
@@ -169,6 +169,23 @@ class BbtTimelineService
             calendarOvulationDay: $calendarOvulationDay
         );
 
+        $calendarOvulationDate = $cycleStart
+            ->copy()
+            ->addDays($calendarOvulationDay - 1)
+            ->toDateString();
+
+        $bbtOvulationDate = null;
+
+        if (
+            ($analysis['usable'] ?? false) &&
+            ($analysis['bbt_ovulation_day'] ?? null)
+        ) {
+            $bbtOvulationDate = $cycleStart
+                ->copy()
+                ->addDays($analysis['bbt_ovulation_day'] - 1)
+                ->toDateString();
+        }
+
         return [
             'id' => $cycleId . '-' . $cycleStart->toDateString(),
             'cycle_id' => $cycleId,
@@ -190,6 +207,8 @@ class BbtTimelineService
 
             'cycle_length' => $cycleLength,
             'calendar_ovulation_day' => $calendarOvulationDay,
+            'calendar_ovulation_date' => $calendarOvulationDate,
+            'bbt_ovulation_date' => $bbtOvulationDate,
 
             'readings' => $readings,
             'analysis' => $analysis,

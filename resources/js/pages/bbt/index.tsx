@@ -133,12 +133,21 @@ export default function Bbt({
         return reading.date === quickDate && reading.id !== null;
     });
 
-    const chartData = timeline
-        ? timeline.readings.filter(
-            (reading): reading is BbtReading & { temperature: number } =>
-                reading.temperature !== null
-        )
+    const rawChartData = timeline
+        ? timeline.readings
         : [];
+
+    const hasTemperatureData = rawChartData.some(
+        (reading) => reading.temperature !== null
+    );
+
+    const chartData = rawChartData.map((reading) => ({
+        ...reading,
+
+        // Invisible helper value so Recharts can show tooltip
+        // even when temperature is null.
+        tooltip_anchor: reading.temperature ?? 36.5,
+    }));
 
     const simpleChartData = [...readings]
         .sort((a, b) => a.date.localeCompare(b.date))
@@ -263,7 +272,6 @@ export default function Bbt({
         );
     }
 
-
     function BbtChartTooltip({
         active,
         payload,
@@ -271,17 +279,27 @@ export default function Bbt({
     }: {
         active?: boolean;
         payload?: {
-            value: number;
-            payload: BbtReading;
+            value: number | null;
+            dataKey?: string;
+            payload: BbtReading & {
+                tooltip_anchor?: number;
+            };
         }[];
-        label?: number;
+        label?: number | string;
     }) {
-        if (!active || !payload || payload.length === 0) {
+        if (!active || label === undefined || label === null) {
             return null;
         }
 
-        const reading = payload[0].payload;
         const cycleDay = Number(label);
+
+        const reading =
+            timeline?.readings.find((item) => item.cycle_day === cycleDay) ??
+            payload?.[0]?.payload;
+
+        if (!reading) {
+            return null;
+        }
 
         const isCalendarOvulation =
             timeline?.calendar_ovulation_day === cycleDay;
@@ -305,20 +323,25 @@ export default function Bbt({
                 </div>
 
                 <div className="mt-2">
-                    Temperature: {Number(reading.temperature).toFixed(2)}°C
+                    Temperature:{' '}
+                    {reading.temperature !== null
+                        ? `${Number(reading.temperature).toFixed(2)}°C`
+                        : 'No BBT reading'}
                 </div>
 
-                {isOutlierDate(reading.date) && (
+                {reading.temperature !== null && isOutlierDate(reading.date) && (
                     <div className="mt-1 text-orange-600">
                         This reading is marked as an outlier and ignored in BBT analysis.
                     </div>
                 )}
 
-                {isIgnoredDate(reading.date) && !isOutlierDate(reading.date) && (
-                    <div className="mt-1 text-muted-foreground">
-                        This reading was ignored in BBT analysis.
-                    </div>
-                )}
+                {reading.temperature !== null &&
+                    isIgnoredDate(reading.date) &&
+                    !isOutlierDate(reading.date) && (
+                        <div className="mt-1 text-muted-foreground">
+                            This reading was ignored in BBT analysis.
+                        </div>
+                    )}
 
                 {(isCalendarOvulation || isBbtOvulation) && (
                     <div className="mt-3 space-y-2 border-t pt-2">
@@ -507,12 +530,16 @@ export default function Bbt({
                                             />
 
                                             <YAxis
-                                                domain={[
-                                                    (dataMin: number) =>
-                                                        Math.floor((dataMin - 0.2) * 100) / 100,
-                                                    (dataMax: number) =>
-                                                        Math.ceil((dataMax + 0.2) * 100) / 100,
-                                                ]}
+                                                domain={
+                                                    hasTemperatureData
+                                                        ? [
+                                                            (dataMin: number) =>
+                                                                Math.floor((dataMin - 0.2) * 100) / 100,
+                                                            (dataMax: number) =>
+                                                                Math.ceil((dataMax + 0.2) * 100) / 100,
+                                                        ]
+                                                        : [36, 37]
+                                                }
                                                 tickFormatter={(value: number) => value.toFixed(2)}
                                             />
 
@@ -534,8 +561,20 @@ export default function Bbt({
 
                                             <Line
                                                 type="monotone"
-                                                dataKey="temp"
+                                                dataKey="tooltip_anchor"
+                                                name="Tooltip Anchor"
+                                                stroke="transparent"
+                                                dot={false}
+                                                activeDot={false}
+                                                legendType="none"
+                                                isAnimationActive={false}
+                                            />
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="temperature"
                                                 name="Temperature"
+                                                connectNulls={true}
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>
@@ -862,7 +901,13 @@ export default function Bbt({
                                 </div>
                             )}
 
-                            {chartData.length > 0 ? (
+                            {!hasTemperatureData && (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    No BBT temperatures are recorded for this cycle range yet, but cycle markers are still shown.
+                                </div>
+                            )}                       
+
+                            {chartData.length > 0 ? (                  
                                 <div className="h-[360px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <LineChart
@@ -884,16 +929,23 @@ export default function Bbt({
                                             />
 
                                             <YAxis
-                                                domain={[
-                                                    (dataMin: number) =>
-                                                        Math.floor((dataMin - 0.2) * 100) / 100,
-                                                    (dataMax: number) =>
-                                                        Math.ceil((dataMax + 0.2) * 100) / 100,
-                                                ]}
+                                                domain={
+                                                    hasTemperatureData
+                                                        ? [
+                                                            (dataMin: number) =>
+                                                                Math.floor((dataMin - 0.2) * 100) / 100,
+                                                            (dataMax: number) =>
+                                                                Math.ceil((dataMax + 0.2) * 100) / 100,
+                                                        ]
+                                                        : [36, 37]
+                                                }
                                                 tickFormatter={(value: number) => value.toFixed(2)}
                                             />
 
-                                            <Tooltip content={<BbtChartTooltip />} />
+                                            <Tooltip
+                                                content={<BbtChartTooltip />}
+                                                filterNull={false}
+                                            />
 
                                             {timeline?.calendar_ovulation_day && (
                                                 <ReferenceLine
@@ -931,8 +983,21 @@ export default function Bbt({
 
                                             <Line
                                                 type="monotone"
+                                                dataKey="tooltip_anchor"
+                                                name="Tooltip Anchor"
+                                                stroke="rgba(0,0,0,0.01)"
+                                                strokeWidth={12}
+                                                dot={false}
+                                                activeDot={false}
+                                                legendType="none"
+                                                isAnimationActive={false}
+                                            />
+
+                                            <Line
+                                                type="monotone"
                                                 dataKey="temperature"
                                                 name="Temperature"
+                                                connectNulls={true}
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>

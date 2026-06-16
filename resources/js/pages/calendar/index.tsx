@@ -104,6 +104,7 @@ const COLOR_MAP = {
     blue: 'bg-blue-500 text-white',
     sky: 'bg-sky-200 text-black',
     green: 'bg-green-200 text-black',
+    teal: 'bg-teal-200 text-black',
     gray: 'bg-gray-200 text-black',
     purple: 'bg-purple-200 text-black',
 } as const;

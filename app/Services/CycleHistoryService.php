@@ -9,7 +9,8 @@ class CycleHistoryService
 {
 
     public function __construct(
-        protected CyclePredictionService $predictionService
+        protected CyclePredictionService $predictionService,
+        protected BbtTimelineService $bbtTimelineService
     ) {}
 
     public function buildCalendarData(
@@ -473,6 +474,51 @@ class CycleHistoryService
                     'data_group' => 'predictions',
                 ];
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | BBT Based Ovulation
+        |--------------------------------------------------------------------------
+        |
+        | This is calculated from BBT temperature shift analysis.
+        | It only appears when BBT permission is allowed and the BBT pattern is usable.
+        |
+        */
+
+        if ($permissions['can_view_bbt']) {
+            $bbtTimelines = $this->bbtTimelineService->buildTimelines(
+                cycles: $sorted,
+                bbtReadings: $bbtReadings
+            );
+
+            foreach ($bbtTimelines as $timeline) {
+                $analysis = $timeline['analysis'] ?? null;
+
+                if (!$analysis || !($analysis['usable'] ?? false)) {
+                    continue;
+                }
+
+               $bbtOvulationDate = $timeline['bbt_ovulation_date'] ?? null;
+
+                if (!$bbtOvulationDate) {
+                    continue;
+                }
+
+                $key = Carbon::parse($bbtOvulationDate)->toDateString();
+
+                if (!isset($calendarDays[$key])) {
+                    $calendarDays[$key] = [];
+                }
+
+                $calendarDays[$key][] = [
+                    'type' => 'bbt_based_ovulation',
+                    'label' => 'BBT ovulation',
+                    'color' => 'teal',
+                    'editable' => false,
+                    'data_group' => 'bbt',
+                ];
+            }
+        }        
 
         /*
         |--------------------------------------------------------------------------
