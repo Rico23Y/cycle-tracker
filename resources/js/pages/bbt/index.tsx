@@ -119,6 +119,29 @@ export default function Bbt({
         return timelines.find((item) => item.id === selectedTimelineId) ?? null;
     }, [timelines, selectedTimelineId]);
 
+    const selectedTimelineIndex = useMemo(() => {
+        return timelines.findIndex((item) => item.id === selectedTimelineId);
+    }, [timelines, selectedTimelineId]);
+
+    const canGoPreviousTimeline = selectedTimelineIndex > 0;
+    const canGoNextTimeline =
+        selectedTimelineIndex >= 0 &&
+        selectedTimelineIndex < timelines.length - 1;
+
+    function goToPreviousTimeline() {
+        if (!canGoPreviousTimeline) return;
+
+        setSelectedTimelineId(timelines[selectedTimelineIndex - 1].id);
+        resetInlineEdit();
+    }
+
+    function goToNextTimeline() {
+        if (!canGoNextTimeline) return;
+
+        setSelectedTimelineId(timelines[selectedTimelineIndex + 1].id);
+        resetInlineEdit();
+    }
+
     const allVisibleReadings = [
         ...timelines.flatMap((item) => item.readings),
         ...readings.map((reading) => ({
@@ -728,25 +751,84 @@ export default function Bbt({
                     </>
                 ) : (
                     <>
-                        <div className="rounded-xl border p-4">
-                            <div className="mb-2 text-sm font-medium">
+                        <div className="rounded-xl border p-4 space-y-2">
+                            <div className="text-sm font-medium">
                                 Select Cycle Range
                             </div>
 
-                            <select
-                                value={selectedTimelineId}
-                                onChange={(e) => {
-                                    setSelectedTimelineId(e.target.value);
-                                    resetInlineEdit();
-                                }}
-                                className="w-full rounded border px-3 py-2 text-sm"
-                            >
-                                {timelines.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                                <select
+                                    value={selectedTimelineId}
+                                    onChange={(e) => {
+                                        setSelectedTimelineId(e.target.value);
+                                        resetInlineEdit();
+                                    }}
+                                    className="min-w-0 w-full rounded border px-3 py-2 text-sm"
+                                >
+                                    {timelines.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.label}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={goToPreviousTimeline}
+                                    disabled={!canGoPreviousTimeline}
+                                    aria-label="Previous cycle range"
+                                    title="Previous cycle range"
+                                    className="
+                                        flex
+                                        h-11
+                                        w-11
+                                        shrink-0
+                                        items-center
+                                        justify-center
+                                        rounded
+                                        border
+                                        text-3xl
+                                        disabled:cursor-not-allowed
+                                        disabled:opacity-50
+                                    "
+                                >
+                                    <span className="-mt-1.5 leading-none">
+                                        ‹
+                                    </span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={goToNextTimeline}
+                                    disabled={!canGoNextTimeline}
+                                    aria-label="Next cycle range"
+                                    title="Next cycle range"
+                                    className="
+                                        flex
+                                        h-11
+                                        w-11
+                                        shrink-0
+                                        items-center
+                                        justify-center
+                                        rounded
+                                        border
+                                        text-3xl
+                                        disabled:cursor-not-allowed
+                                        disabled:opacity-50
+                                    "
+                                >
+                                    <span className="-mt-1.5 leading-none">
+                                        ›
+                                    </span>
+                                </button>
+                            </div>
+
+                            {timeline && (
+                                <div className="text-xs text-muted-foreground">
+                                    Showing {selectedTimelineIndex + 1} of {timelines.length}
+                                </div>
+                            )}
+
                         </div>
 
                         {canEditBbt && (
