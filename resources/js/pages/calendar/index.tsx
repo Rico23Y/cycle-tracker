@@ -6,6 +6,13 @@ import { calendar } from '@/routes';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 
+import {
+    formatTemperature,
+    normalizeTemperatureForStorage,
+    temperatureInputValue,
+    temperatureUnitLabel,
+} from '@/lib/temperature';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Calendar',
@@ -47,7 +54,7 @@ type CalendarEvent = {
     is_estimated?: boolean;
 
     bbt_id?: number;
-    temperature?: number;
+    temperature?: number | string | null;
 
     symptom_id?: number;
     symptom_type?: string;
@@ -121,10 +128,17 @@ export default function Calendar({
     cycleCount = 0,
     canEditCycles: canEditCyclesFromServer = true,
 }: Props) {
-    const { errors, dataAccess } = usePage().props as {
+    const { auth, errors, dataAccess } = usePage().props as {
+        auth: {
+            user: {
+                temperature_unit?: 'celsius' | 'fahrenheit';
+            };
+        };
         errors?: Record<string, string>;
         dataAccess?: DataAccess;
     };
+
+    const temperatureUnit = auth.user.temperature_unit ?? 'celsius';
 
     const permissions = dataAccess?.permissions;
 
@@ -532,11 +546,12 @@ export default function Calendar({
                                                 {date.getDate()}
                                             </span>
 
-                                            {bbtEvent?.temperature && (
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {Number(bbtEvent.temperature).toFixed(2)}°C
-                                                </span>
-                                            )}
+                                            {bbtEvent?.temperature !== null &&
+                                                bbtEvent?.temperature !== undefined && (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {formatTemperature(bbtEvent.temperature, temperatureUnit)}
+                                                    </span>
+                                                )}
 
                                             {!bbtEvent && lockedBbtEvent && (
                                                 <span className="text-[10px] text-muted-foreground">
@@ -956,7 +971,7 @@ export default function Calendar({
                                         ) : selectedBbt ? (
                                             <div className="text-sm">
                                                 <div>
-                                                    Temperature: {Number(selectedBbt.temperature).toFixed(2)}°C
+                                                    Temperature: {formatTemperature(selectedBbt.temperature, temperatureUnit)}
                                                 </div>
 
                                                 <ActorInfo event={selectedBbt} />
@@ -968,7 +983,9 @@ export default function Calendar({
                                                             onClick={() => {
                                                                 setActiveAction('edit_bbt');
                                                                 setActiveEvent(selectedBbt);
-                                                                setTemperature(String(selectedBbt.temperature ?? ''));
+                                                                setTemperature(
+                                                                    temperatureInputValue(selectedBbt.temperature, temperatureUnit)
+                                                                );
                                                             }}
                                                         >
                                                             Edit BBT
@@ -1084,7 +1101,10 @@ export default function Calendar({
                                                         `/bbt${ownerQuery}`,
                                                         {
                                                             date: selectedKey,
-                                                            temperature,
+                                                            temperature: normalizeTemperatureForStorage(
+                                                                temperature,
+                                                                temperatureUnit
+                                                            ).toFixed(3),
                                                         },
                                                         {
                                                             preserveScroll: true,
@@ -1102,7 +1122,10 @@ export default function Calendar({
                                                     router.put(
                                                         `/bbt/${activeEvent.bbt_id}${ownerQuery}`,
                                                         {
-                                                            temperature,
+                                                            temperature: normalizeTemperatureForStorage(
+                                                                temperature,
+                                                                temperatureUnit
+                                                            ).toFixed(3),
                                                         },
                                                         {
                                                             preserveScroll: true,
@@ -1207,7 +1230,7 @@ export default function Calendar({
                                                         step="0.01"
                                                         value={temperature}
                                                         onChange={(e) => setTemperature(e.target.value)}
-                                                        placeholder="Temperature °C"
+                                                        placeholder={`Temperature ${temperatureUnitLabel(temperatureUnit)}`}
                                                         className="w-full rounded border px-2 py-1 text-sm"
                                                     />
 

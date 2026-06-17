@@ -4,6 +4,14 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 import {
+    displayTemperatureValue,
+    formatTemperature,
+    normalizeTemperatureForStorage,
+    temperatureInputValue,
+    temperatureUnitLabel,
+} from '@/lib/temperature';
+
+import {
     LineChart,
     Line,
     XAxis,
@@ -82,7 +90,12 @@ export default function Bbt({
     cycleCount,
     bbtLocked = false,
 }: Props) {
-    const { errors, dataAccess } = usePage().props as {
+    const { auth, errors, dataAccess } = usePage().props as {
+        auth: {
+            user: {
+                temperature_unit?: 'celsius' | 'fahrenheit';
+            };
+        };
         errors?: Record<string, string>;
         dataAccess?: {
             owner_key: string;
@@ -93,6 +106,8 @@ export default function Bbt({
             };
         };
     };
+
+    const temperatureUnit = auth.user.temperature_unit ?? 'celsius';
 
     const canViewBbt = dataAccess?.permissions.can_view_bbt ?? true;
     const canEditBbt = dataAccess?.permissions.can_edit_bbt ?? true;
@@ -164,19 +179,27 @@ export default function Bbt({
         (reading) => reading.temperature !== null
     );
 
-    const chartData = rawChartData.map((reading) => ({
-        ...reading,
+    const chartData = rawChartData.map((reading) => {
+        const displayTemperature = displayTemperatureValue(
+            reading.temperature,
+            temperatureUnit
+        );
 
-        // Invisible helper value so Recharts can show tooltip
-        // even when temperature is null.
-        tooltip_anchor: reading.temperature ?? 36.5,
-    }));
+        return {
+            ...reading,
+            temperature: displayTemperature,
+            raw_temperature: reading.temperature,
+            tooltip_anchor:
+                displayTemperature ??
+                (temperatureUnit === 'fahrenheit' ? 97.7 : 36.5),
+        };
+    });
 
     const simpleChartData = [...readings]
         .sort((a, b) => a.date.localeCompare(b.date))
         .map((reading) => ({
             date: reading.date,
-            temp: Number(reading.temperature),
+            temp: displayTemperatureValue(reading.temperature, temperatureUnit),
         }));
 
     const useSimpleBbtMode =
@@ -230,7 +253,10 @@ export default function Bbt({
             router.put(
                 `/bbt/${existingReadingForQuickDate.id}${ownerQuery}`,
                 {
-                    temperature: quickTemperature,
+                    temperature: normalizeTemperatureForStorage(
+                        quickTemperature,
+                        temperatureUnit
+                    ).toFixed(3),
                 },
                 {
                     preserveScroll: true,
@@ -247,7 +273,10 @@ export default function Bbt({
             `/bbt${ownerQuery}`,
             {
                 date: quickDate,
-                temperature: quickTemperature,
+                temperature: normalizeTemperatureForStorage(
+                    quickTemperature,
+                    temperatureUnit
+                ).toFixed(3),
             },
             {
                 preserveScroll: true,
@@ -267,11 +296,16 @@ export default function Bbt({
 
         if (!value) return;
 
+        const normalizedTemperature = normalizeTemperatureForStorage(
+            value,
+            temperatureUnit
+        ).toFixed(3);
+
         if (reading.id) {
             router.put(
                 `/bbt/${reading.id}${ownerQuery}`,
                 {
-                    temperature: value,
+                    temperature: normalizedTemperature,
                 },
                 {
                     preserveScroll: true,
@@ -306,6 +340,7 @@ export default function Bbt({
             dataKey?: string;
             payload: BbtReading & {
                 tooltip_anchor?: number;
+                raw_temperature?: number | null;
             };
         }[];
         label?: number | string;
@@ -348,7 +383,7 @@ export default function Bbt({
                 <div className="mt-2">
                     Temperature:{' '}
                     {reading.temperature !== null
-                        ? `${Number(reading.temperature).toFixed(2)}°C`
+                        ? `${formatTemperature(reading.temperature, temperatureUnit)}`
                         : 'No BBT reading'}
                 </div>
 
@@ -396,7 +431,7 @@ export default function Bbt({
 
                 {analysis?.usable && analysis.cover_line !== null && (
                     <div className="mt-2 text-muted-foreground">
-                        Cover line: {analysis.cover_line.toFixed(1)}°C
+                        Cover line: {formatTemperature(analysis.cover_line, temperatureUnit, 1)}
                     </div>
                 )}
             </div>
@@ -493,7 +528,7 @@ export default function Bbt({
                                         step="0.01"
                                         value={quickTemperature}
                                         onChange={(e) => setQuickTemperature(e.target.value)}
-                                        placeholder="Temperature °C"
+                                        placeholder={`Temperature ${temperatureUnitLabel(temperatureUnit)}`}
                                         className="rounded border px-3 py-2 text-sm"
                                     />
 
@@ -577,7 +612,7 @@ export default function Bbt({
                                                     });
                                                 }}
                                                 formatter={(value) => [
-                                                    `${Number(value).toFixed(2)}°C`,
+                                                    `${Number(value).toFixed(2)}${temperatureUnitLabel(temperatureUnit)}`,
                                                     'Temperature',
                                                 ]}
                                             />
@@ -595,7 +630,7 @@ export default function Bbt({
 
                                             <Line
                                                 type="monotone"
-                                                dataKey="temperature"
+                                                dataKey="temp"
                                                 name="Temperature"
                                                 connectNulls={true}
                                             />
@@ -662,12 +697,12 @@ export default function Bbt({
                                                                         step="0.01"
                                                                         value={tableTemperature}
                                                                         onChange={(e) => setTableTemperature(e.target.value)}
-                                                                        placeholder="Temp °C"
+                                                                        placeholder={`Temp ${temperatureUnitLabel(temperatureUnit)}`}
                                                                         className="w-32 rounded border px-2 py-1 text-sm"
                                                                     />
                                                                 ) : (
                                                                     <span>
-                                                                        {Number(reading.temperature).toFixed(2)}°C
+                                                                        {formatTemperature(reading.temperature, temperatureUnit)}
                                                                     </span>
                                                                 )}
                                                             </td>
@@ -711,7 +746,9 @@ export default function Bbt({
                                                                                     className="rounded border px-2 py-1 text-xs"
                                                                                     onClick={() => {
                                                                                         setEditingDate(reading.date);
-                                                                                        setTableTemperature(String(reading.temperature ?? ''));
+                                                                                        setTableTemperature(
+                                                                                                temperatureInputValue(reading.temperature, temperatureUnit)
+                                                                                            );
                                                                                     }}
                                                                                 >
                                                                                     Edit
@@ -859,7 +896,7 @@ export default function Bbt({
                                         step="0.01"
                                         value={quickTemperature}
                                         onChange={(e) => setQuickTemperature(e.target.value)}
-                                        placeholder="Temperature °C"
+                                        placeholder={`Temperature ${temperatureUnitLabel(temperatureUnit)}`}
                                         className="rounded border px-3 py-2 text-sm"
                                     />
 
@@ -947,7 +984,7 @@ export default function Bbt({
 
                                         <div className="mt-1 font-semibold">
                                             {analysis.cover_line !== null
-                                                ? `${analysis.cover_line.toFixed(1)}°C`
+                                                ? formatTemperature(analysis.cover_line, temperatureUnit, 1)
                                                 : '—'}
                                         </div>
                                     </div>
@@ -1147,7 +1184,7 @@ export default function Bbt({
                                                         <td className="py-2">
                                                             {reading.id && !isEditing ? (
                                                                 <span>
-                                                                    {Number(reading.temperature).toFixed(2)}°C
+                                                                    {formatTemperature(reading.temperature, temperatureUnit)}
 
                                                                     {isOutlierDate(reading.date) && (
                                                                         <span className="ml-2 rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
@@ -1176,7 +1213,7 @@ export default function Bbt({
                                                                             }));
                                                                         }
                                                                     }}
-                                                                    placeholder="Temp °C"
+                                                                    placeholder={`Temp ${temperatureUnitLabel(temperatureUnit)}`}
                                                                     className="w-32 rounded border px-2 py-1 text-sm"
                                                                 />
                                                             ) : (
@@ -1215,7 +1252,9 @@ export default function Bbt({
                                                                                     className="rounded border px-2 py-1 text-xs"
                                                                                     onClick={() => {
                                                                                         setEditingDate(reading.date);
-                                                                                        setTableTemperature(String(reading.temperature ?? ''));
+                                                                                        setTableTemperature(
+                                                                                            temperatureInputValue(reading.temperature, temperatureUnit)
+                                                                                        );
                                                                                     }}
                                                                                 >
                                                                                     Edit

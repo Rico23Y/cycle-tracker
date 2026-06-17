@@ -498,7 +498,7 @@ class CycleHistoryService
                     continue;
                 }
 
-               $bbtOvulationDate = $timeline['bbt_ovulation_date'] ?? null;
+                $bbtOvulationDate = $timeline['bbt_ovulation_date'] ?? null;
 
                 if (!$bbtOvulationDate) {
                     continue;
@@ -536,10 +536,10 @@ class CycleHistoryService
             $calendarDays[$key][] = $permissions['can_view_bbt']
                 ? [
                     'type' => 'bbt',
-                    'label' => $reading->temperature . '°C',
+                    'label' => 'BBT',
+                    'temperature' => $reading->temperature,
                     'color' => 'gray',
                     'bbt_id' => $reading->id,
-                    'temperature' => $reading->temperature,
                     'created_by_name' => $reading->createdBy?->name,
                     'updated_by_name' => $reading->updatedBy?->name,
                     'created_at' => $reading->created_at?->toISOString(),

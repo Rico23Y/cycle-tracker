@@ -6,6 +6,12 @@ import { DayPicker } from 'react-day-picker';
 import { dashboard } from '@/routes';
 
 import {
+    displayTemperatureValue,
+    normalizeTemperatureForStorage,
+    temperatureUnitLabel,
+} from '@/lib/temperature';
+
+import {
     LineChart,
     Line,
     XAxis,
@@ -91,9 +97,16 @@ export default function Dashboard({
     predictionsLocked = false,
     canEditBbt = true,
 }: Props) {
-    const { dataAccess } = usePage().props as {
+    const { auth, dataAccess } = usePage().props as {
+        auth: {
+            user: {
+                temperature_unit?: 'celsius' | 'fahrenheit';
+            };
+        };
         dataAccess?: DataAccess;
     };
+
+    const temperatureUnit = auth.user.temperature_unit ?? 'celsius';
 
     const permissions = dataAccess?.permissions;
 
@@ -132,7 +145,7 @@ export default function Dashboard({
         return 7;
     }, [chartWidth]);
 
-    const { data, setData, post, processing, reset } = useForm({
+    const { data, setData, post, processing, reset, transform } = useForm({
         temperature: '',
         date: new Date().toISOString().slice(0, 10),
     });
@@ -160,7 +173,16 @@ export default function Dashboard({
 
         if (!canLogBbt) return;
 
+        transform((currentData) => ({
+            ...currentData,
+            temperature: normalizeTemperatureForStorage(
+                currentData.temperature,
+                temperatureUnit
+            ).toFixed(3),
+        }));
+
         post(`/bbt${ownerQuery}`, {
+            preserveScroll: true,
             onSuccess: () => reset('temperature'),
         });
     }
@@ -170,7 +192,7 @@ export default function Dashboard({
         .reverse()
         .map((r) => ({
             date: r.date,
-            temp: Number(r.temperature),
+            temp: displayTemperatureValue(r.temperature, temperatureUnit),
         }));
 
     if (cycleCount === 0) {
@@ -319,7 +341,7 @@ export default function Dashboard({
 
                                             <Tooltip
                                                 formatter={(value) => [
-                                                    `${Number(value).toFixed(2)}°C`,
+                                                    `${Number(value).toFixed(2)}${temperatureUnitLabel(temperatureUnit)}`,
                                                     'Temperature',
                                                 ]}
                                             />
@@ -349,7 +371,7 @@ export default function Dashboard({
                                     <input
                                         type="number"
                                         step="0.01"
-                                        placeholder="Temp"
+                                        placeholder={`Temp ${temperatureUnitLabel(temperatureUnit)}`}
                                         value={data.temperature}
                                         onChange={e => setData('temperature', e.target.value)}
                                         className="rounded border px-2 py-1 text-sm"
