@@ -17,6 +17,7 @@ trait ProfileValidationRules
         return [
             'name' => $this->nameRules(),
             'email' => $this->emailRules($userId),
+            'temperature_unit' => $this->temperatureUnitRules(),
         ];
     }
 
@@ -45,6 +46,20 @@ trait ProfileValidationRules
             $userId === null
                 ? Rule::unique(User::class)
                 : Rule::unique(User::class)->ignore($userId),
+        ];
+    }
+
+    /**
+     * Get the validation rules used to validate the user's preferred temperature unit.
+     *
+     * @return array<int, \Illuminate\Contracts\Validation\Rule|array<mixed>|string>
+     */
+    protected function temperatureUnitRules(): array
+    {
+        return [
+            'required',
+            'string',
+            Rule::in(['celsius', 'fahrenheit']),
         ];
     }
 }

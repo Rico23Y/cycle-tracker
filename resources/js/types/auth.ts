@@ -1,3 +1,5 @@
+export type TemperatureUnit = 'celsius' | 'fahrenheit';
+
 export type User = {
     id: number;
     name: string;
@@ -5,6 +7,7 @@ export type User = {
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
+    temperature_unit: TemperatureUnit;
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

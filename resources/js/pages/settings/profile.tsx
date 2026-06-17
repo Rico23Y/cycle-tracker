@@ -91,6 +91,48 @@ export default function Profile({
                                     />
                                 </div>
 
+                                <div className="grid gap-2">
+                                    <Label htmlFor="temperature_unit">
+                                        Temperature unit
+                                    </Label>
+
+                                    <select
+                                        id="temperature_unit"
+                                        name="temperature_unit"
+                                        defaultValue={auth.user.temperature_unit ?? 'celsius'}
+                                        className="
+                                            mt-1
+                                            block
+                                            w-full
+                                            rounded-md
+                                            border
+                                            border-input
+                                            bg-background
+                                            px-3
+                                            py-2
+                                            text-sm
+                                            shadow-sm
+                                        "
+                                    >
+                                        <option value="celsius">
+                                            Celsius °C
+                                        </option>
+
+                                        <option value="fahrenheit">
+                                            Fahrenheit °F
+                                        </option>
+                                    </select>
+
+                                    <p className="text-sm text-muted-foreground">
+                                        BBT values are stored internally in Celsius for accurate analysis.
+                                    </p>
+
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.temperature_unit}
+                                    />
+                                </div>
+
                                 {mustVerifyEmail &&
                                     auth.user.email_verified_at === null && (
                                         <div>

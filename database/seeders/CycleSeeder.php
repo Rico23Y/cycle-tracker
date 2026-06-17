@@ -21,6 +21,7 @@ class CycleSeeder extends Seeder
                 'name' => 'Test User',
                 'password' => 'password',
                 'email_verified_at' => now(),
+                'temperature_unit' => 'celsius',
             ]
         );
 
@@ -30,6 +31,7 @@ class CycleSeeder extends Seeder
                 'name' => 'Test User 2',
                 'password' => 'password',
                 'email_verified_at' => now(),
+                'temperature_unit' => 'celsius',
             ]
         );
 
@@ -39,6 +41,7 @@ class CycleSeeder extends Seeder
                 'name' => 'Test User 3',
                 'password' => 'password',
                 'email_verified_at' => now(),
+                'temperature_unit' => 'celsius',
             ]
         );
 
