@@ -19,12 +19,12 @@ import type { NavItem } from '@/types';
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(), // before '/dashboard'
+        href: '/dashboard', // before  dashboard()
         icon: LayoutGrid,
     },
     {
         title: 'Calendar',
-        href: calendar(), // before '/dashboard'
+        href: '/calendar', // before   calendar()
         icon: Calendar,
     },
     {

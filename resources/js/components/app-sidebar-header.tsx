@@ -1,13 +1,20 @@
+import { usePage } from '@inertiajs/react';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import DataOwnerSwitcher from '@/components/data-owner-switcher';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
-import DataOwnerSwitcher from '@/components/data-owner-switcher';
 
 export function AppSidebarHeader({
     breadcrumbs = [],
 }: {
     breadcrumbs?: BreadcrumbItemType[];
 }) {
+    const { url } = usePage();
+
+    const shouldShowDataOwnerSwitcher =
+        !url.startsWith('/partners') &&
+        !url.startsWith('/settings');
+
     return (
         <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/50 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4">
             <div className="flex items-center gap-2">
@@ -15,7 +22,7 @@ export function AppSidebarHeader({
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
 
-            <DataOwnerSwitcher />
+            {shouldShowDataOwnerSwitcher && <DataOwnerSwitcher />}
         </header>
     );
 }

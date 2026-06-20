@@ -14,8 +14,9 @@ type UserSummary = {
     id: number;
     name: string;
     email: string;
+    avatar?: string | null;
+    avatar_url?: string | null;
 };
-
 type PartnerStatus = 'active' | 'pending' | 'paused' | 'declined';
 
 type RequestType = 'share_mine' | 'request_theirs' | 'both';
@@ -140,6 +141,66 @@ type EditableEditKey =
 type ViewOnlyKey =
     | 'can_view_predictions'
     | 'can_view_insights';
+
+function UserAvatar({
+    name,
+    avatarUrl,
+}: {
+    name: string;
+    avatarUrl?: string | null;
+}) {
+    const initials = name
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+
+    return (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted text-sm font-medium">
+            {avatarUrl ? (
+                <img
+                    src={avatarUrl}
+                    alt={name}
+                    className="h-full w-full object-cover"
+                />
+            ) : (
+                <span>{initials || '?'}</span>
+            )}
+        </div>
+    );
+}
+
+function PersonHeader({
+    name,
+    email,
+    avatarUrl,
+    children,
+}: {
+    name: string;
+    email?: string | null;
+    avatarUrl?: string | null;
+    children?: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-start gap-3">
+            <UserAvatar name={name} avatarUrl={avatarUrl} />
+
+            <div>
+                <div className="font-medium">
+                    {name}
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                    {email || 'No email'}
+                </div>
+
+                {children}
+            </div>
+        </div>
+    );
+}
 
 export default function Partners({
     partners,
@@ -790,7 +851,11 @@ export default function Partners({
                             {pendingRequestsForMyData.map((request) => (
                                 <div key={request.id} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-4">
-                                        <div>
+                                        <PersonHeader
+                                            name={request.partner_user?.name ?? request.name}
+                                            email={request.partner_user?.email ?? request.email}
+                                            avatarUrl={request.partner_user?.avatar_url}
+                                            >
                                             <div className="font-medium">
                                                 {request.requested_by?.name ?? request.name}
                                             </div>
@@ -802,7 +867,7 @@ export default function Partners({
                                             <div className="mt-1 text-xs text-blue-600">
                                                 This user is requesting access to your data.
                                             </div>
-                                        </div>
+                                        </PersonHeader>
 
                                         {request.partner_user_id ? (
                                             <div className="flex gap-2">
@@ -921,15 +986,11 @@ export default function Partners({
                             {activePeopleIShareWith.map((partner) => (
                                 <div key={partner.id} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div className="font-medium">
-                                                {partner.name}
-                                            </div>
-
-                                            <div className="text-sm text-muted-foreground">
-                                                {partner.email || 'No email'}
-                                            </div>
-
+                                        <PersonHeader
+                                            name={partner.partner_user?.name ?? partner.name}
+                                            email={partner.partner_user?.email ?? partner.email}
+                                            avatarUrl={partner.partner_user?.avatar_url}
+                                        >
                                             <div className="mt-1 text-xs">
                                                 Account:{' '}
                                                 {partner.partner_user_id ? (
@@ -946,7 +1007,7 @@ export default function Partners({
                                             <div className="mt-1 text-xs text-green-600">
                                                 This partner can access your data.
                                             </div>
-                                        </div>
+                                        </PersonHeader>
 
                                         <div className="flex gap-2">
                                             <button
@@ -994,7 +1055,11 @@ export default function Partners({
                             {pendingInvitationsToViewTheirData.map((share) => (
                                 <div key={share.id} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-4">
-                                        <div>
+                                        <PersonHeader
+                                            name={share.partner_user?.name ?? share.name}
+                                            email={share.partner_user?.email ?? share.email}
+                                            avatarUrl={share.partner_user?.avatar_url}
+                                        >
                                             <div className="font-medium">
                                                 {share.owner?.name ?? 'Unknown owner'}
                                             </div>
@@ -1006,7 +1071,7 @@ export default function Partners({
                                             <div className="mt-1 text-xs text-blue-600">
                                                 This user invited you to access their data.
                                             </div>
-                                        </div>
+                                        </PersonHeader>
 
                                         <div className="flex gap-2">
                                             <button
@@ -1034,19 +1099,15 @@ export default function Partners({
                             {activeSharesWithMe.map((share) => (
                                 <div key={share.id} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div className="font-medium">
-                                                {share.owner?.name ?? 'Unknown owner'}
-                                            </div>
-
-                                            <div className="text-sm text-muted-foreground">
-                                                {share.owner?.email ?? 'No email'}
-                                            </div>
-
+                                        <PersonHeader
+                                            name={share.owner?.name ?? 'Unknown owner'}
+                                            email={share.owner?.email}
+                                            avatarUrl={share.owner?.avatar_url}
+                                        >
                                             <div className="mt-1 text-xs text-green-600">
                                                 This share is active and appears in your data owner switcher.
                                             </div>
-                                        </div>
+                                        </PersonHeader>
 
                                         <button
                                             type="button"
@@ -1080,32 +1141,39 @@ export default function Partners({
 
                         <div className="grid gap-3">
                             {[...inactivePeopleIShareWith, ...inactiveSharesWithMe].map((share) => (
+                                <PersonHeader
+                                    name={share.partner_user?.name ?? share.name}
+                                    email={share.partner_user?.email ?? share.email}
+                                    avatarUrl={share.partner_user?.avatar_url}
+                                >
+                                
                                 <div key={share.id} className="rounded-lg border p-4">
-                                    <div className="font-medium">
-                                        {share.owner_user_id === currentUserId
-                                            ? share.name
-                                            : share.owner?.name ?? 'Unknown owner'}
-                                    </div>
+                                        <div className="font-medium">
+                                            {share.owner_user_id === currentUserId
+                                                ? share.name
+                                                : share.owner?.name ?? 'Unknown owner'}
+                                        </div>
 
-                                    <div className="text-sm text-muted-foreground">
-                                        {share.owner_user_id === currentUserId
-                                            ? share.email ?? 'No email'
-                                            : share.owner?.email ?? 'No email'}
-                                    </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {share.owner_user_id === currentUserId
+                                                ? share.email ?? 'No email'
+                                                : share.owner?.email ?? 'No email'}
+                                        </div>
 
-                                    <div className="mt-1 text-xs">
-                                        Status:{' '}
-                                        <span
-                                            className={
-                                                share.status === 'paused'
-                                                    ? 'text-orange-600'
-                                                    : 'text-red-600'
-                                            }
-                                        >
-                                            {share.status}
-                                        </span>
+                                        <div className="mt-1 text-xs">
+                                            Status:{' '}
+                                            <span
+                                                className={
+                                                    share.status === 'paused'
+                                                        ? 'text-orange-600'
+                                                        : 'text-red-600'
+                                                }
+                                            >
+                                                {share.status}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
+                                </PersonHeader>
                             ))}
                         </div>
                     </div>

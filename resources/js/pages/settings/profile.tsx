@@ -1,5 +1,5 @@
 import { Transition } from '@headlessui/react';
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
@@ -29,6 +29,15 @@ export default function Profile({
 }) {
     const { auth } = usePage().props;
 
+    const avatarForm = useForm<{
+        avatar: File | null;
+    }>({
+        avatar: null,
+    });
+
+    const avatarPreview = avatarForm.data.avatar
+        ? URL.createObjectURL(avatarForm.data.avatar)
+        : auth.user.avatar_url;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Profile settings" />
@@ -37,11 +46,97 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+
+                            avatarForm.post('/settings/profile/avatar', {
+                                forceFormData: true,
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    avatarForm.reset('avatar');
+                                },
+                            });
+                        }}
+                        className="space-y-4 rounded-xl border p-4"
+                    >
+                        <div>
+                            <div className="text-sm font-medium">
+                                Profile picture
+                            </div>
+
+                            <p className="text-sm text-muted-foreground">
+                                Upload a JPG, PNG, or WebP image up to 2 MB.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border bg-muted">
+                                {avatarPreview ? (
+                                    <img
+                                        src={avatarPreview}
+                                        alt={auth.user.name}
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-xl font-semibold">
+                                        {auth.user.name.charAt(0).toUpperCase()}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="grid flex-1 gap-2">
+                                <Input
+                                    id="avatar"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) => {
+                                        avatarForm.setData(
+                                            'avatar',
+                                            e.target.files?.[0] ?? null
+                                        );
+                                    }}
+                                />
+
+                                {avatarForm.errors.avatar && (
+                                    <InputError message={avatarForm.errors.avatar} />
+                                )}
+
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="submit"
+                                        disabled={avatarForm.processing || !avatarForm.data.avatar}
+                                    >
+                                        {avatarForm.processing ? 'Uploading...' : 'Change profile picture'}
+                                    </Button>
+
+                                    {auth.user.avatar_url && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                if (!confirm('Remove your profile picture?')) {
+                                                    return;
+                                                }
+
+                                                router.delete('/settings/profile/avatar', {
+                                                    preserveScroll: true,
+                                                });
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </form>    
+
                     <Heading
                         variant="small"
                         title="Profile information"
                         description="Update your name and email address"
-                    />
+                    />                
 
                     <Form
                         {...ProfileController.update.form()}

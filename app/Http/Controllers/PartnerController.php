@@ -11,15 +11,15 @@ use Inertia\Inertia;
 
 class PartnerController extends Controller
 {
-public function index()
+    public function index()
     {
         $user = auth()->user();
 
         $partners = $user
             ->partners()
             ->with([
-                'partnerUser:id,name,email',
-                'requestedBy:id,name,email',
+                'partnerUser:id,name,email,avatar',
+                'requestedBy:id,name,email,avatar',
             ])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -27,8 +27,8 @@ public function index()
         $sharedWithMe = $user
             ->sharedWithMe()
             ->with([
-                'owner:id,name,email',
-                'requestedBy:id,name,email',
+                'owner:id,name,email,avatar',
+                'requestedBy:id,name,email,avatar',
             ])
             ->orderBy('created_at', 'desc')
             ->get();

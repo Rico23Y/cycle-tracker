@@ -26,7 +26,7 @@ class DataAccessContextService
         $shareId = (int) str_replace('partner:', '', $ownerKey);
 
         $share = Partner::query()
-            ->with('owner:id,name,email')
+            ->with('owner:id,name,email,avatar')
             ->where('id', $shareId)
             ->where('partner_user_id', $viewer->id)
             ->where('status', 'active')
@@ -40,6 +40,9 @@ class DataAccessContextService
             'owner' => $share->owner,
             'owner_key' => 'partner:' . $share->id,
             'owner_label' => $share->owner->name . "'s Data",
+            'owner_name' => $share->owner->name,
+            'owner_email' => $share->owner->email,
+            'owner_avatar_url' => $share->owner->avatar_url,
             'is_self' => false,
             'share' => $share,
             'permissions' => $this->permissionsFromShare($share),
@@ -54,6 +57,9 @@ class DataAccessContextService
         return [
             'owner_key' => $context['owner_key'],
             'owner_label' => $context['owner_label'],
+            'owner_name' => $context['owner_name'],
+            'owner_email' => $context['owner_email'],
+            'owner_avatar_url' => $context['owner_avatar_url'],
             'is_self' => $context['is_self'],
             'permissions' => $context['permissions'],
             'available_owners' => $context['available_owners'],
@@ -66,6 +72,9 @@ class DataAccessContextService
             'owner' => $viewer,
             'owner_key' => 'me',
             'owner_label' => 'My Data',
+            'owner_name' => $viewer->name,
+            'owner_email' => $viewer->email,
+            'owner_avatar_url' => $viewer->avatar_url,
             'is_self' => true,
             'share' => null,
             'permissions' => $this->selfPermissions(),
@@ -79,12 +88,15 @@ class DataAccessContextService
             [
                 'key' => 'me',
                 'label' => 'My Data',
+                'name' => $viewer->name,
+                'email' => $viewer->email,
+                'avatar_url' => $viewer->avatar_url,
                 'is_selected' => $selectedKey === 'me',
             ],
         ];
 
         $sharedWithMe = $viewer->sharedWithMe()
-            ->with('owner:id,name,email')
+            ->with('owner:id,name,email,avatar')
             ->where('status', 'active')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -99,6 +111,9 @@ class DataAccessContextService
             $owners[] = [
                 'key' => $key,
                 'label' => $share->owner->name . "'s Data",
+                'name' => $share->owner->name,
+                'email' => $share->owner->email,
+                'avatar_url' => $share->owner->avatar_url,
                 'is_selected' => $selectedKey === $key,
             ];
         }

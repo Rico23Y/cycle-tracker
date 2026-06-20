@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -9,27 +9,66 @@ import {
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
+const DATA_OWNER_PATHS = [
+    '/dashboard',
+    '/calendar',
+    '/cycles',
+    '/bbt',
+    '/insights',
+];
+
+function shouldPreserveOwner(href: string) {
+    return DATA_OWNER_PATHS.some((path) => href.startsWith(path));
+}
+
+function hrefWithStoredOwner(href: string) {
+    if (typeof window === 'undefined') {
+        return href;
+    }
+
+    if (!shouldPreserveOwner(href)) {
+        return href;
+    }
+
+    const selectedOwner = localStorage.getItem('cycle-tracker:selected-owner');
+
+    if (!selectedOwner || selectedOwner === 'me') {
+        return href;
+    }
+
+    const url = new URL(href, window.location.origin);
+    url.searchParams.set('owner', selectedOwner);
+
+    return `${url.pathname}${url.search}`;
+}
+
 export function NavMain({ items = [] }: { items: NavItem[] }) {
     const { isCurrentUrl } = useCurrentUrl();
+    const { url } = usePage();
 
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarMenu>
-                {items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                            asChild
-                            isActive={isCurrentUrl(item.href)}
-                            tooltip={{ children: item.title }}
-                        >
-                            <Link href={item.href} prefetch>
-                                {item.icon && <item.icon />}
-                                <span>{item.title}</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ))}
+                {items.map((item) => {
+                    const href = item.href.toString();
+                    const finalHref = hrefWithStoredOwner(href);
+
+                    return (
+                        <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isCurrentUrl(href) || url.startsWith(href)}
+                                tooltip={{ children: item.title }}
+                            >
+                                <Link href={finalHref} prefetch>
+                                    {item.icon && <item.icon />}
+                                    <span>{item.title}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    );
+                })}
             </SidebarMenu>
         </SidebarGroup>
     );
