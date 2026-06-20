@@ -312,9 +312,9 @@ export default function Dashboard({
                         </div>
                     ) : (
                         <>
-                            <div ref={chartRef} className="h-[240px]">
+                            <div ref={chartRef} className="h-[240px] min-h-[240px] min-w-0">
                                 {chartData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <LineChart data={chartData}>
                                             <XAxis
                                                 dataKey="date"

@@ -109,12 +109,6 @@ export default function Cycle({
         dataAccess?: DataAccess;
     };
 
-    console.log('cycles props', {
-        cycleLocked,
-        timelines,
-        dataAccess,
-    });
-
     const permissions = dataAccess?.permissions;
 
     const canViewCycles = permissions?.can_view_cycles ?? true;

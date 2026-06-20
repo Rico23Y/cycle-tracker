@@ -57,7 +57,7 @@ trait ProfileValidationRules
     protected function temperatureUnitRules(): array
     {
         return [
-            'required',
+            'nullable',
             'string',
             Rule::in(['celsius', 'fahrenheit']),
         ];

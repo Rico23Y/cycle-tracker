@@ -572,8 +572,8 @@ export default function Bbt({
                                     </p>
                                 </div>
 
-                                <div className="h-[320px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-[320px] min-h-[320px] min-w-0">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <LineChart data={simpleChartData}>
                                             <XAxis
                                                 dataKey="date"
@@ -1027,7 +1027,7 @@ export default function Bbt({
                             )}                       
 
                             {chartData.length > 0 ? (                  
-                                <div className="h-[360px]">
+                                <div className="h-[360px] min-h-[360px] min-w-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <LineChart
                                             data={chartData}

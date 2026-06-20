@@ -23,6 +23,10 @@ class BbtReadingController extends Controller
         $owner = $context['owner'];
         $permissions = $context['permissions'];
 
+        $cycles = $owner->cycles()
+            ->orderBy('start_date')
+            ->get();
+
         if (!$permissions['can_view_bbt']) {
             return Inertia::render('bbt/index', [
                 'timelines' => [],
@@ -32,19 +36,14 @@ class BbtReadingController extends Controller
             ]);
         }
 
-        $cycles = $owner->cycles()
-            ->orderBy('start_date')
-            ->get();
-
         $bbtReadings = $owner->bbtReadings()
             ->orderBy('date')
             ->get();
 
-        $timelines = $timelineService
-            ->buildTimelines(
-                $cycles,
-                $bbtReadings
-            );
+        $timelines = $timelineService->buildTimelines(
+            $cycles,
+            $bbtReadings
+        );
 
         return Inertia::render('bbt/index', [
             'timelines' => $timelines,

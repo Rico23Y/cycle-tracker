@@ -34,9 +34,9 @@ class CycleHistoryService
             'can_view_insights' => true,
         ], $permissions);
 
-        if ($cycles->count() < 2) {
-            return [];
-        }
+    if ($cycles->count() === 0) {
+        return [];
+    }
 
         $sorted = $cycles->sortBy('start_date')->values();
 
@@ -209,15 +209,14 @@ class CycleHistoryService
         |--------------------------------------------------------------------------
         */
 
-        if (!$prediction) {
-            return $calendarDays;
-        }
+        if ($prediction) {
 
         /*
         |--------------------------------------------------------------------------
         | Predicted Period
         |--------------------------------------------------------------------------
         */
+        
 
         for ($d = 0; $d < $prediction['average_period_length']; $d++) {
 
@@ -525,6 +524,8 @@ class CycleHistoryService
         | BBT Readings
         |--------------------------------------------------------------------------
         */
+
+        }
 
         foreach ($bbtReadings as $reading) {
             $key = Carbon::parse($reading->date)->toDateString();

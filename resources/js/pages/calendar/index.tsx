@@ -191,6 +191,7 @@ export default function Calendar({
         | 'move_day_one'
         | 'update_period_end'
         | 'add_actual_period'
+        | 'add_day_one'
         | 'add_bbt'
         | 'edit_bbt'
         | 'add_symptom'
@@ -522,68 +523,70 @@ export default function Calendar({
                                 );
 
                                 return (
-                                    <div
-                                        className="
-                                            h-24
-                                            rounded-md
-                                            border
-                                            p-1
-                                            text-xs
-                                            transition
-                                            hover:bg-muted/50
-                                            flex
-                                            flex-col
-                                            gap-1
-                                            overflow-hidden
-                                        "
-                                        onClick={() => {
-                                            setSelectedDate(date);
-                                            resetActionForm();
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-semibold">
-                                                {date.getDate()}
-                                            </span>
+                                    <td className={props.className}>
+                                        <div
+                                            className="
+                                                h-24
+                                                rounded-md
+                                                border
+                                                p-1
+                                                text-xs
+                                                transition
+                                                hover:bg-muted/50
+                                                flex
+                                                flex-col
+                                                gap-1
+                                                overflow-hidden
+                                            "
+                                            onClick={() => {
+                                                setSelectedDate(date);
+                                                resetActionForm();
+                                            }}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-semibold">
+                                                    {date.getDate()}
+                                                </span>
 
-                                            {bbtEvent?.temperature !== null &&
-                                                bbtEvent?.temperature !== undefined && (
+                                                {bbtEvent?.temperature !== null &&
+                                                    bbtEvent?.temperature !== undefined && (
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            {formatTemperature(bbtEvent.temperature, temperatureUnit)}
+                                                        </span>
+                                                    )}
+
+                                                {!bbtEvent && lockedBbtEvent && (
                                                     <span className="text-[10px] text-muted-foreground">
-                                                        {formatTemperature(bbtEvent.temperature, temperatureUnit)}
+                                                        BBT locked
                                                     </span>
                                                 )}
+                                            </div>
 
-                                            {!bbtEvent && lockedBbtEvent && (
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    BBT locked
-                                                </span>
-                                            )}
+                                            <div className="flex flex-col gap-1">
+                                                {nonBbtEvents.map((event, index) => {
+                                                    const bgColor = getBgColor(event.color);
+
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            title={event.label}
+                                                            className={`
+                                                                truncate
+                                                                rounded
+                                                                px-1
+                                                                py-0.5
+                                                                text-[10px]
+                                                                ${bgColor}
+                                                            `}
+                                                        >
+                                                            {event.locked ? '🔒 ' : ''}
+                                                            {event.label}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-
-                                        <div className="flex flex-col gap-1">
-                                            {nonBbtEvents.map((event, index) => {
-                                                const bgColor = getBgColor(event.color);
-
-                                                return (
-                                                    <div
-                                                        key={index}
-                                                        title={event.label}
-                                                        className={`
-                                                            truncate
-                                                            rounded
-                                                            px-1
-                                                            py-0.5
-                                                            text-[10px]
-                                                            ${bgColor}
-                                                        `}
-                                                    >
-                                                        {event.locked ? '🔒 ' : ''}
-                                                        {event.label}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    </td>
                                 );
                             },
                         }}
@@ -626,6 +629,26 @@ export default function Calendar({
                                     event.type !== 'locked_symptom'
                             );
 
+                            const hasPredictedDayOne = selectedMainEvents.some(
+                                event => event.type === 'day_one_predicted_period'
+                            );
+
+                            const hasActualDayOne = selectedMainEvents.some(
+                                event => event.type === 'day_one_actual_period'
+                            );
+
+                            const hasActualPeriodEvent = selectedMainEvents.some(
+                                event =>
+                                    event.type === 'actual_period' ||
+                                    event.type === 'ongoing_actual_period'
+                            );
+
+                            const canManuallyAddDayOne =
+                                canEditCycles &&
+                                !hasPredictedDayOne &&
+                                !hasActualDayOne &&
+                                !hasActualPeriodEvent;
+
                             return (
                                 <>
                                     <div>
@@ -646,8 +669,23 @@ export default function Calendar({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <div className="text-sm text-muted-foreground">
-                                            Events
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm text-muted-foreground">
+                                                Events
+                                            </div>
+
+                                            {canManuallyAddDayOne && (
+                                                <button
+                                                    className="rounded border px-2 py-1 text-xs"
+                                                    onClick={() => {
+                                                        setActiveAction('add_day_one');
+                                                        setActiveEvent(null);
+                                                        setActionDate(selectedKey);
+                                                    }}
+                                                >
+                                                    Add Day One
+                                                </button>
+                                            )}
                                         </div>
 
                                         {selectedMainEvents.length > 0 ? (
@@ -1077,7 +1115,10 @@ export default function Calendar({
                                                     return;
                                                 }
 
-                                                if (activeAction === 'add_actual_period') {
+                                                if (
+                                                    activeAction === 'add_actual_period' ||
+                                                    activeAction === 'add_day_one'
+                                                ) {
                                                     if (!canEditCycles) return;
 
                                                     router.post(
@@ -1191,6 +1232,7 @@ export default function Calendar({
                                                 {activeAction === 'move_day_one' && 'Move Day One'}
                                                 {activeAction === 'update_period_end' && 'Update Period End'}
                                                 {activeAction === 'add_actual_period' && 'Add Actual Period'}
+                                                {activeAction === 'add_day_one' && 'Add Day One'}
                                                 {activeAction === 'add_bbt' && 'Add BBT'}
                                                 {activeAction === 'edit_bbt' && 'Edit BBT'}
                                                 {activeAction === 'add_symptom' && 'Add Symptom'}
