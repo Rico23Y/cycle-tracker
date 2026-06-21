@@ -518,9 +518,30 @@ export default function Calendar({
                                     event => event.type === 'locked_bbt'
                                 );
 
-                                const nonBbtEvents = events.filter(
-                                    event => event.type !== 'bbt'
+                                const symptoms = events.filter(
+                                    event => event.type === 'symptom'
                                 );
+
+                                const lockedSymptoms = events.filter(
+                                    event => event.type === 'locked_symptom'
+                                );
+
+                                const nonBbtEvents = events.filter(
+                                    event =>
+                                        event.type !== 'bbt' &&
+                                        event.type !== 'symptom' &&
+                                        event.type !== 'locked_symptom'
+                                );
+
+                                const visibleEvents = nonBbtEvents.slice(0, 3);
+
+                                const hiddenEventCount =
+                                    Math.max(0, nonBbtEvents.length - visibleEvents.length);
+
+                                const visibleSymptoms = symptoms.slice(0, 2);
+
+                                const hiddenSymptomCount =
+                                    Math.max(0, symptoms.length - visibleSymptoms.length);
 
                                 return (
                                     <td className={props.className}>
@@ -563,12 +584,12 @@ export default function Calendar({
                                             </div>
 
                                             <div className="flex flex-col gap-1">
-                                                {nonBbtEvents.map((event, index) => {
+                                                {visibleEvents.map((event, index) => {
                                                     const bgColor = getBgColor(event.color);
 
                                                     return (
                                                         <div
-                                                            key={index}
+                                                            key={`${event.type}-${index}`}
                                                             title={event.label}
                                                             className={`
                                                                 truncate
@@ -584,6 +605,37 @@ export default function Calendar({
                                                         </div>
                                                     );
                                                 })}
+
+                                                {visibleSymptoms.map((event, index) => (
+                                                    <div
+                                                        key={`symptom-${event.symptom_id ?? index}`}
+                                                        title={event.label}
+                                                        className="
+                                                            truncate
+                                                            rounded
+                                                            bg-purple-200
+                                                            px-1
+                                                            py-0.5
+                                                            text-[10px]
+                                                            text-black
+                                                        "
+                                                    >
+                                                        {event.symptom_type ?? 'Symptom'}{' '}
+                                                        {'★'.repeat(event.level ?? 0)}
+                                                    </div>
+                                                ))}
+
+                                                {lockedSymptoms.length > 0 && (
+                                                    <div className="truncate rounded bg-gray-200 px-1 py-0.5 text-[10px] text-black">
+                                                        🔒 Symptoms locked
+                                                    </div>
+                                                )}
+
+                                                {(hiddenEventCount > 0 || hiddenSymptomCount > 0) && (
+                                                    <div className="truncate rounded bg-gray-100 px-1 py-0.5 text-[10px] text-muted-foreground">
+                                                        +{hiddenEventCount + hiddenSymptomCount} more
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </td>
@@ -872,26 +924,26 @@ export default function Calendar({
                                     <div className="border-t pt-4 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <div className="text-sm font-medium">
-                                                Symptoms
+                                                Symptoms {selectedSymptoms.length > 0 && `(${selectedSymptoms.length})`}
                                             </div>
 
-                                            {canViewSymptoms &&
-                                                canEditSymptoms &&
-                                                selectedSymptoms.length === 0 && (
-                                                    <button
-                                                        className="rounded border px-2 py-1 text-xs"
-                                                        onClick={() => {
-                                                            setActiveAction('add_symptom');
-                                                            setActiveEvent(null);
-                                                            setSymptomType('');
-                                                            setCustomSymptomType('');
-                                                            setSymptomLevel('1');
-                                                            setSymptomNotes('');
-                                                        }}
-                                                    >
-                                                        Add Symptom
-                                                    </button>
-                                                )}
+                                            {canViewSymptoms && canEditSymptoms && (
+                                                <button
+                                                    className="rounded border px-2 py-1 text-xs"
+                                                    onClick={() => {
+                                                        setActiveAction('add_symptom');
+                                                        setActiveEvent(null);
+                                                        setSymptomType('');
+                                                        setCustomSymptomType('');
+                                                        setSymptomLevel('1');
+                                                        setSymptomNotes('');
+                                                    }}
+                                                >
+                                                    {selectedSymptoms.length > 0
+                                                        ? 'Add Another'
+                                                        : 'Add Symptom'}
+                                                </button>
+                                            )}
                                         </div>
 
                                         {!canViewSymptoms || lockedSymptoms.length > 0 ? (
