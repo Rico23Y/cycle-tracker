@@ -34,6 +34,9 @@ class InsightController extends Controller
             return Inertia::render('insights/index', [
                 'insights' => [
                     'ranges' => [],
+                    'default_range_key' => null,
+                    'regularity' => null,
+                    'recommendations' => [],
                 ],
                 'insightsLocked' => true,
                 'lockReason' => !$permissions['can_view_insights']
@@ -46,8 +49,24 @@ class InsightController extends Controller
             ->orderBy('start_date')
             ->get();
 
-        $insights = $insightService
-            ->buildInsights($cycles);
+        $bbtReadings = $permissions['can_view_bbt']
+            ? $owner->bbtReadings()
+                ->orderBy('date')
+                ->get()
+            : collect();
+
+        $symptoms = $permissions['can_view_symptoms']
+            ? $owner->symptoms()
+                ->orderBy('date')
+                ->get()
+            : collect();
+
+        $insights = $insightService->buildInsights(
+            cycles: $cycles,
+            bbtReadings: $bbtReadings,
+            symptoms: $symptoms,
+            permissions: $permissions
+        );
 
         return Inertia::render('insights/index', [
             'insights' => $insights,

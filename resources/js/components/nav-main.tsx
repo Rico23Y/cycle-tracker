@@ -17,6 +17,25 @@ const DATA_OWNER_PATHS = [
     '/insights',
 ];
 
+type HrefValue = NavItem['href'];
+
+function hrefToString(href: HrefValue): string {
+    if (typeof href === 'string') {
+        return href;
+    }
+
+    if (
+        typeof href === 'object' &&
+        href !== null &&
+        'url' in href &&
+        typeof href.url === 'string'
+    ) {
+        return href.url;
+    }
+
+    return String(href);
+}
+
 function shouldPreserveOwner(href: string) {
     return DATA_OWNER_PATHS.some((path) => href.startsWith(path));
 }
@@ -49,9 +68,10 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
+
             <SidebarMenu>
                 {items.map((item) => {
-                    const href = item.href.toString();
+                    const href = hrefToString(item.href);
                     const finalHref = hrefWithStoredOwner(href);
 
                     return (
