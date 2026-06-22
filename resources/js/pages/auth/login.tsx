@@ -25,10 +25,10 @@ export default function Login({
 }: Props) {
     return (
         <AuthLayout
-            title="Log in to your account"
-            description="Enter your email and password below to log in"
+            title="Welcome back to CycleWise"
+            description="Track your cycle, BBT, symptoms, and fertility insights in one private space."
         >
-            <Head title="Log in" />
+            <Head title="Log in to CycleWise" />
 
             <Form
                 {...store.form()}
@@ -94,15 +94,15 @@ export default function Login({
                                 data-test="login-button"
                             >
                                 {processing && <Spinner />}
-                                Log in
+                                Log in to CycleWise
                             </Button>
                         </div>
 
                         {canRegister && (
                             <div className="text-center text-sm text-muted-foreground">
-                                Don't have an account?{' '}
+                                New to CycleWise?{' '}
                                 <TextLink href={register()} tabIndex={5}>
-                                    Sign up
+                                    Create an account
                                 </TextLink>
                             </div>
                         )}

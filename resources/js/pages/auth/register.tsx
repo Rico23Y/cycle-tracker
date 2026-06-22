@@ -13,10 +13,10 @@ import { store } from '@/routes/register';
 export default function Register() {
     return (
         <AuthLayout
-            title="Create an account"
-            description="Enter your details below to create your account"
+            title="Create your CycleWise account"
+            description="Start tracking Day One, BBT, symptoms, and cycle patterns."
         >
-            <Head title="Register" />
+            <Head title="Create a CycleWise account" />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -95,7 +95,7 @@ export default function Register() {
                                 data-test="register-user-button"
                             >
                                 {processing && <Spinner />}
-                                Create account
+                                Start tracking
                             </Button>
                         </div>
 
