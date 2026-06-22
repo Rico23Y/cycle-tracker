@@ -35,16 +35,39 @@ It helps users track menstrual cycles, Day One records, basal body temperature, 
 
 ## Screenshots
 
-Screenshots will be added soon.
+### Landing Page
 
-Recommended screenshots:
+![CycleWise landing page](public/screenshots/01-landing.png)
 
-* Dashboard
-* Calendar
-* BBT page
-* Insights page
-* Partners page
-* Profile settings
+### Dashboard
+
+![CycleWise dashboard overview](public/screenshots/02-dashboard-overview.png)
+
+### Calendar
+
+![CycleWise calendar overview](public/screenshots/04-calendar-overview.png)
+
+### BBT Tracking
+
+![CycleWise BBT tracking page](public/screenshots/08-bbt-overview.png)
+
+### Insights
+
+![CycleWise insights page](public/screenshots/10-insights-overview.png)
+
+### Partner Sharing
+
+![CycleWise partner request page](public/screenshots/14-partners-send-request.png)
+
+### Shared Partner Data
+
+![CycleWise partner shared dashboard](public/screenshots/18-partner-dashboard-shared-data.png)
+
+### Settings
+
+![CycleWise settings page](public/screenshots/19-settings-profile.png)
+
+Additional screenshots are available in [`public/screenshots`](public/screenshots), including detailed views for dashboard, calendar, cycles, BBT, insights, partner request flow, and settings.
 
 ## Demo Accounts
 
