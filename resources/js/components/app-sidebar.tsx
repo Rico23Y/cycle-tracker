@@ -51,13 +51,13 @@ const mainNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
+        title: 'GitHub',
+        href: 'https://github.com/Rico23Y/cycle-tracker',
         icon: FolderGit2,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
+        title: 'Project README',
+        href: 'https://github.com/Rico23Y/cycle-tracker#readme',
         icon: BookOpen,
     },
 ];
