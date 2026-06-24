@@ -553,7 +553,7 @@ export default function Dashboard({
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
                             <Link
                                 href={`/calendar${ownerQuery}`}
                                 className="rounded-xl border p-4 text-sm transition hover:bg-muted/50"
@@ -1004,46 +1004,46 @@ export default function Dashboard({
                     </div>
 
                     {/* RECENT ACTIVITY */}
-                        <div className="rounded-xl border bg-card p-4">
-                            <div>
-                                <h2 className="font-semibold">
-                                    Recent activity
-                                </h2>
+                    <div className="rounded-xl border bg-card p-4 xl:col-span-3">
+                        <div>
+                            <h2 className="font-semibold">
+                                Recent activity
+                            </h2>
 
-                                <p className="text-sm text-muted-foreground">
-                                    Latest cycle, BBT, and symptom records.
-                                </p>
-                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Latest cycle, BBT, and symptom records.
+                            </p>
+                        </div>
 
-                            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {recentActivity.length > 0 ? (
-                                    recentActivity.map((item, index) => (
-                                        <div
-                                            key={`${item.type}-${item.date}-${index}`}
-                                            className="rounded-lg border p-3 text-sm"
-                                        >
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="font-medium">
-                                                    {item.label}
-                                                </div>
-
-                                                <div className="rounded-full border px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                                                    {item.type}
-                                                </div>
+                        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-3">
+                            {recentActivity.length > 0 ? (
+                                recentActivity.map((item, index) => (
+                                    <div
+                                        key={`${item.type}-${item.date}-${index}`}
+                                        className="min-w-0 rounded-lg border p-3 text-sm"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 break-words font-medium">
+                                                {item.label}
                                             </div>
 
-                                            <div className="mt-1 text-muted-foreground">
-                                                {formatDate(item.date)}
+                                            <div className="shrink-0 rounded-full border px-2 py-0.5 text-xs capitalize text-muted-foreground">
+                                                {item.type}
                                             </div>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-                                        No recent activity yet.
+
+                                        <div className="mt-1 break-words text-muted-foreground">
+                                            {formatDate(item.date)}
+                                        </div>
                                     </div>
-                                )}
-                            </div>
+                                ))
+                            ) : (
+                                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    No recent activity yet.
+                                </div>
+                            )}
                         </div>
+                    </div>
                 </div>
             </div>
         </AppLayout>
