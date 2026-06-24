@@ -7,7 +7,7 @@ import '../css/app.css';
 import { initializeTheme } from '@/hooks/use-appearance';
 import 'react-day-picker/dist/style.css';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'CycleWise';
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
