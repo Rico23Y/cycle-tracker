@@ -10,6 +10,10 @@ use App\Http\Controllers\SymptomController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
+Route::get('/health', function () {
+    return response('OK', 200);
+})->name('health');
+
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
