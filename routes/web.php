@@ -9,6 +9,7 @@ use App\Http\Controllers\InsightController;
 use App\Http\Controllers\SymptomController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\App;
 use Laravel\Fortify\Features;
 
@@ -20,8 +21,9 @@ Route::get('/demo-reset/{key}', function (string $key) {
         403
     );
 
-    Artisan::call('migrate:fresh', [
-        '--seed' => true,
+    DB::statement('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
+
+    Artisan::call('db:seed', [
         '--force' => true,
     ]);
 
