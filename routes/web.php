@@ -8,7 +8,28 @@ use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\InsightController;
 use App\Http\Controllers\SymptomController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\App;
 use Laravel\Fortify\Features;
+
+Route::get('/demo-reset/{key}', function (string $key) {
+    abort_unless(App::environment('production'), 404);
+
+    abort_unless(
+        hash_equals((string) config('app.demo_reset_key'), $key),
+        403
+    );
+
+    Artisan::call('migrate:fresh', [
+        '--seed' => true,
+        '--force' => true,
+    ]);
+
+    return response()->json([
+        'message' => 'Demo database has been reset and seeded.',
+        'output' => Artisan::output(),
+    ]);
+})->name('demo-reset');
 
 Route::get('/health', function () {
     return response('OK', 200);
