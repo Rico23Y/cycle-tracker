@@ -9,3 +9,5 @@ storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
 public/buildNe
+public/hot
+public/build

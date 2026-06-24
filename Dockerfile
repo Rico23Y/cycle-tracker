@@ -37,6 +37,8 @@ RUN npm ci
 
 COPY . .
 
+RUN rm -f public/hot
+
 RUN npm run build
 
 RUN composer dump-autoload --optimize
