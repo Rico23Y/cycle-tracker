@@ -11,3 +11,5 @@ storage/framework/views/*
 public/buildNe
 public/hot
 public/build
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
